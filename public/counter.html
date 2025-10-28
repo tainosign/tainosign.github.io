@@ -248,10 +248,16 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     let currentCount = 0;
     let day1TotalIn = 0;
     let day2TotalIn = 0;
-    
-    // 現在の「日本時間での日付」(年月日まで比較用)
+
     const now = new Date();
     const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+
+    // 🔹過去◯分（可変）を設定
+    const lookbackMinutes = 30; // ←ここを変えれば可変
+    const lookbackMs = lookbackMinutes * 60 * 1000;
+    const sinceTime = new Date(now.getTime() - lookbackMs);
+
+    let recentInCount = 0; // 過去30分間の入場数
 
     snapshot.forEach(doc => {
         const data = doc.data();
@@ -259,34 +265,39 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
         const eventDay = data.event_day;
         const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
         const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+        if (!ts) return;
 
-        // 日付の一致確認（timestampが存在しない場合は除外）
-        if (ts) {
-            const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-            if (tsDateStr !== todayStr) return; // 当日以外のデータは無視
-        } else {
-            return;
-        }
+        const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        if (tsDateStr !== todayStr) return; // 当日以外は無視
 
-        // 当日データのみ集計
+        // 当日データを集計
         if (type === 'in') {
             currentCount += count;
             if (eventDay === 'day1') day1TotalIn += count;
             else if (eventDay === 'day2') day2TotalIn += count;
+
+            // 🔹30分以内のデータをカウント
+            if (ts >= sinceTime) recentInCount += count;
         } else if (type === 'out') {
             currentCount -= count;
         }
     });
 
-    // データがなければ0で初期化
+    // 🔹現在場内人数
     currentCount = Math.max(0, currentCount);
     currentCountValueEl.textContent = currentCount.toLocaleString();
+
+    // 🔹各日合計
     day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
     day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
 
-    // 待ち時間（50人ごとに5分）
-    const waitTime = Math.max(0, Math.floor(currentCount / 50) * 5);
-    waitTimeValueEl.textContent = waitTime;
+    // 🔹100人あたり待ち時間を算出
+    let waitTimeText = '--';
+    if (recentInCount > 0) {
+        const timePer100 = 3000 / recentInCount; // 分単位
+        waitTimeText = timePer100.toFixed(1); // 小数1桁
+    }
+    waitTimeValueEl.textContent = waitTimeText;
 
 }, (error) => {
     console.error(`ログデータ監視エラー: ${error.message}`);
@@ -396,5 +407,6 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
