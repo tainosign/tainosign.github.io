@@ -251,46 +251,56 @@
                 console.error("日付設定の購読エラー:", error);
             });
 
-            // --- B. ログデータの監視と集計 (logコレクション) ---
-            onSnapshot(getLogCollectionRef(db), (snapshot) => {
-                let currentCount = 0;
-                let day1TotalIn = 0;
-                let day2TotalIn = 0;
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const type = data.type; // "in" または "out"
-                    const eventDay = data.event_day; // "day1" または "day2"
-                    // countフィールドが有効でなければ1として扱う
-                    const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1; 
+ // --- B. ログデータの監視と集計 (logコレクション) ---
+onSnapshot(getLogCollectionRef(db), (snapshot) => {
+    let currentCount = 0;
+    let day1TotalIn = 0;
+    let day2TotalIn = 0;
+    
+    // 現在の「日本時間での日付」(年月日まで比較用)
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-                    if (type === 'in') {
-                        currentCount += count;
-                        if (eventDay === 'day1') {
-                            day1TotalIn += count;
-                        } else if (eventDay === 'day2') {
-                            day2TotalIn += count;
-                        }
-                    } else if (type === 'out') {
-                        currentCount -= count;
-                    }
-                });
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const type = data.type; // "in" or "out"
+        const eventDay = data.event_day;
+        const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
+        const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
 
-                // UIに集計結果を反映
-                currentCount = Math.max(0, currentCount); 
-                currentCountValueEl.textContent = currentCount.toLocaleString();
-                day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
-                day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
-                
-                // 待ち時間計算（50人ごとに5分追加）
-                let waitTime = Math.max(0, Math.floor(currentCount / 50) * 5); 
-                waitTimeValueEl.textContent = waitTime;
-                
-            }, (error) => {
-                console.error(`ログデータ監視エラー: ${error.message}`);
-                currentCountValueEl.textContent = 'データエラー';
-                waitTimeValueEl.textContent = '--';
-            });
+        // 日付の一致確認（timestampが存在しない場合は除外）
+        if (ts) {
+            const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+            if (tsDateStr !== todayStr) return; // 当日以外のデータは無視
+        } else {
+            return;
+        }
+
+        // 当日データのみ集計
+        if (type === 'in') {
+            currentCount += count;
+            if (eventDay === 'day1') day1TotalIn += count;
+            else if (eventDay === 'day2') day2TotalIn += count;
+        } else if (type === 'out') {
+            currentCount -= count;
+        }
+    });
+
+    // データがなければ0で初期化
+    currentCount = Math.max(0, currentCount);
+    currentCountValueEl.textContent = currentCount.toLocaleString();
+    day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
+    day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
+
+    // 待ち時間（50人ごとに5分）
+    const waitTime = Math.max(0, Math.floor(currentCount / 50) * 5);
+    waitTimeValueEl.textContent = waitTime;
+
+}, (error) => {
+    console.error(`ログデータ監視エラー: ${error.message}`);
+    currentCountValueEl.textContent = 'データエラー';
+    waitTimeValueEl.textContent = '--';
+});
         }
 
         // ----------------------------------------------------
@@ -343,5 +353,6 @@
     </script>
 </body>
 </html>
+
 
 
