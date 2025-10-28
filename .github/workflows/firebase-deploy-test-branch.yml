@@ -33,4 +33,4 @@ jobs:
           # デプロイチャネル（本番環境）
           channelId: live
           # プロジェクトID (未指定の場合は .firebaserc から自動検出)
-          projectId: panmarketcounter
+          projectId: setapanmarketcounter
