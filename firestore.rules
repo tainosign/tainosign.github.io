@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ----------------------------------------------------------------------
+    // 1. 公開データ領域 (log, static/day, summary のすべてをカバー)
+    // ----------------------------------------------------------------------
+    // パス: /artifacts/{appId}/public/data/以下の全てのドキュメントとサブコレクション
+    match /artifacts/{appId}/public/data/{document=**} {
+      // ユーザーが認証済みであれば（request.auth != null）、読み取りと書き込みを許可する。
+      // これにより、すべてのリアルタイムリスナーのエラーが解消されます。
+      allow read, write: if request.auth != null;
+    }
+    
+    // ----------------------------------------------------------------------
+    // 2. プライベートデータ領域
+    // ----------------------------------------------------------------------
+    match /artifacts/{appId}/users/{userId}/{documents=**} {
+      // ユーザー自身のデータのみ、読み書きを許可
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}
