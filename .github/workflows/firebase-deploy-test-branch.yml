@@ -29,7 +29,7 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           # GitHub Secretsに登録済みのトークンを使用
-          firebaseServiceAccount: ${{ secrets.FIREBASE_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SETAPANMARKETCOUNTER }}
           # デプロイチャネル（本番環境）
           channelId: live
           # プロジェクトID (未指定の場合は .firebaserc から自動検出)
