@@ -1,496 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <base target="_top">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>入場側カウンター</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>入場カウンター</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <style>
-        /* 💡 画面全体に入場ボタンを最大化 */
         body { 
             font-family: 'Inter', sans-serif; 
-            text-align: center; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #f4f4f4; 
-            height: 100vh;
+            background-color: #f0f2f5; 
             display: flex;
             flex-direction: column;
-            box-sizing: border-box;
-            touch-action: pan-y; /* スクロールを許可 */
+            min-height: 100vh;
         }
-
-        /* --- 💡 ヘッダー領域のスタイル --- */
-        .header-container {
-            background-color: #17a2b8; /* cyan-view */
-            color: white;
-            padding: 3vw 5vw; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            width: 100%;
-            box-sizing: border-box;
-            flex-shrink: 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        /* QRコードコンテナ */
-        .qr-code-area {
-            flex-shrink: 0; 
-            margin-right: 4vw; 
-            width: 30vw; 
-            height: auto;
-            display: flex; 
-            align-items: center;
-            justify-content: center;
-            max-width: 150px; 
-        }
-
-        /* QRコード画像 */
-        #qr-image {
-            width: 100% !important; 
-            height: auto !important; 
-            border-radius: 5px;
-            background-color: white; 
-            padding: 5px;
-            object-fit: contain; 
-        }
-
-        /* 情報エリア全体 */
-        .info-area {
-            text-align: right; 
-            flex-grow: 1; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: flex-end; 
-        }
-
-        /* 対象日 */
-        #target-date {
-            font-size: 4.5vw; 
-            margin-bottom: 0.2vw; 
-            line-height: 1.2;
-            white-space: nowrap; 
-        }
-
-        /* 現在場内人数 */
-        #current-count-display { 
-            font-size: 5vw; 
-            font-weight: bold;
-            white-space: nowrap; 
-            margin-bottom: 0.5vw;
-        }
-
-        #current-count-value { 
-            font-weight: bold; 
-            font-size: 12vw; 
-            color: #FFC107; /* 黄色で目立たせる */
-            line-height: 1;
-        }
-
-        #wait-time-display, .total-visitors {
-            font-size: 3.5vw; 
-            line-height: 1.2;
-        }
-        #wait-time-display{
-            margin-top: -1vw; 
-            margin-bottom: 0.1vw; 
-        }
-
-        /* --- メインコンテンツ（ボタンエリア） --- */
-        #main-content { 
-            flex-grow: 1; 
-            display: flex;
-            flex-direction: column;
-            padding: 4vw 5vw 2vw; 
-            width: 100%; 
-            margin: 0 auto;
-            box-sizing: border-box;
-        }
-        
-        /* +1 メインボタン */
-        #in-btn {
-            width: 100%; 
-            font-size: 25vw;
-            font-weight: bold;
-            color: white; 
-            border: none; 
-            border-radius: 3vw 3vw 0 0; 
-            background-color: #4CAF50; /* 緑 */
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); 
-            cursor: pointer; 
-            transition: background-color 0.1s, transform 0.1s;
-            touch-action: manipulation;
-            margin-bottom: 3px; 
-            flex-grow: 1; 
-        }
-        #in-btn:active { background-color: #3e8e41; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transform: translateY(3px); }
-
-        /* 複数ボタンのコンテナ */
-        .multi-count-group {
-            display: flex;
-            width: 100%;
-            flex-shrink: 0;
-            height: 15vh;
-        }
-
-        /* 複数ボタンの共通スタイル */
-        .multi-count-btn {
+        .main-content {
+            overflow-y: auto;
             flex-grow: 1;
-            padding: 0; 
-            font-size: 10vw; 
-            font-weight: bold;
-            color: white;
-            border: none;
-            background-color: #6c757d; 
-            cursor: pointer;
-            transition: background-color 0.1s, transform 0.1s;
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); 
-            touch-action: manipulation;
-            line-height: 1; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 1rem;
         }
-        .multi-count-btn:active { background-color: #495057; transform: translateY(2px); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
-
-        /* +5 ボタンのスタイル */
-        #in-btn-5 {
-            border-radius: 0 0 0 3vw; 
-            margin-right: 3px; 
+        .menu-link {
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
-
-        /* +10 ボタンのスタイル */
-        #in-btn-10 {
-            border-radius: 0 0 3vw 0; 
-        }
-
-        #status { 
-            flex-shrink: 0; 
-            margin-top: 2vw; 
-            font-size: 4vw; 
-            color: #666; 
-            min-height: 5vw; 
-        }
-
-        /* 戻るボタン */
-        .back-button-container {
-            flex-shrink: 0;
-            width: 90vw;
-            margin: 0 auto 5vw;
-        }
-        .back-button {
-            display: block; 
-            padding: 3vw 5vw; 
-            background-color: #6c757d; 
-            color: white; 
-            border: none; 
-            border-radius: 2vw; 
-            text-decoration: none;
-            font-size: 4vw;
-            transition: background-color 0.1s;
-        }
-        .back-button:active {
-            background-color: #495057;
-        }
-
-        .updating {
-            transition: all 0.2s ease-in-out;
-            color: #FFC107 !important; 
-            transform: scale(1.05);
+        .menu-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
         }
     </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'green-in': '#00a040',
+                        'red-out': '#e53935',
+                        'yellow-claim': '#ffc107',
+                        'cyan-view': '#17a2b8',
+                        'orange-calc': '#ff9800',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
 <body>
-    <!-- Firebase SDKの読み込み -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // ----------------------------------------------------
-        // 1. Firebase設定とグローバル変数 
-        // ----------------------------------------------------
-        // グローバル変数から設定を取得し、ない場合は空のオブジェクトを使用
-        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // ★★★ ユーザー要求のフォールバック認証情報の適用 ★★★
-        if (Object.keys(firebaseConfig).length === 0) {
-            console.warn("環境変数__firebase_configが見つかりません。ハードコードされた設定を使用します。");
-            firebaseConfig = {
-                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
-                authDomain: "setapanmarketcounter.firebaseapp.com",
-                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
-                projectId: "setapanmarketcounter",
-                storageBucket: "setapanmarketcounter.firebasestorage.app",
-                messagingSenderId: "546423839721",
-                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
-                measurementId: "G-70KHJ0P1P1"
-            };
-        }
+    <!-- ✅ index.htmlと完全一致のヘッダー -->
+    <header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
+            <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
+                <img id="qr-code-image" src="qr.png" alt="QRコード画像をここに配置" 
+                     class="w-full h-full object-contain rounded"
+                     onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
+            </div>
 
-        // 提供されたログ情報からアプリIDを取得し、Firebase Configが存在しない場合のフォールバックを確保
-        // projectIdまたはappIdをフォールバックとして使用
-        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId || firebaseConfig.appId || 'setapanmarketcounter';
-
-        // Firestore パス定義 
-        // /artifacts/{appId}/public/data/log/...
-        const LOG_COLLECTION_PATH = `artifacts/${appId}/public/data/log`;
-        // /artifacts/{appId}/public/data/summary/counts
-        const summaryDocRef = (db) => doc(db, `artifacts/${appId}/public/data/summary`, 'counts');
-        // /artifacts/{appId}/public/data/static/day (日付設定ドキュメント)
-        const dateConfigDocRef = (db) => doc(db, `artifacts/${appId}/public/data/static`, 'day');
-
-        let db, auth, userId;
-        let isProcessing = false;
-        let currentEventDay = 'day1'; // デフォルト値（日付設定が取得できない場合）
-        
-        // UI要素 (グローバルスコープで取得)
-        const currentCountValueEl = document.getElementById('current-count-value');
-        const waitTimeValueEl = document.getElementById('wait-time-value');
-        const totalVisitorsEl = document.querySelector('.total-visitors');
-        const targetDateEl = document.getElementById('target-date');
-        const statusElement = document.getElementById('status');
-
-
-        // ----------------------------------------------------
-        // 2. ヘッダー情報のリアルタイム更新ロジック
-        // ----------------------------------------------------
-        function setupRealtimeListener(db) {
-            
-            // --- A. 日付設定のリアルタイム監視 ---
-            onSnapshot(dateConfigDocRef(db), (doc) => {
-                if (doc.exists()) {
-                    const data = doc.data();
-                    // day1, day2がタイムスタンプとして保存されていると仮定し、日付文字列に変換
-                    const day1Timestamp = data.day1; 
-                    const day2Timestamp = data.day2;
-                    currentEventDay = data.current_day || 'day1'; // 設定ドキュメントにcurrent_dayフィールドがあるか確認
-
-                    let day1DateStr = '---';
-                    let day2DateStr = '---';
-                    
-                    // タイムスタンプをローカルの日付文字列にフォーマット
-                    if (day1Timestamp && day1Timestamp.toDate) {
-                        day1DateStr = day1Timestamp.toDate().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
-                    }
-                    if (day2Timestamp && day2Timestamp.toDate) {
-                        day2DateStr = day2Timestamp.toDate().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
-                    }
-
-                    // ヘッダーUIの更新
-                    const displayDate = currentEventDay === 'day1' ? day1DateStr : day2DateStr;
-                    targetDateEl.textContent = `対象日: ${currentEventDay} (${displayDate})`;
-                    targetDateEl.classList.remove('text-red-500'); 
-                    
-                } else {
-                    // ドキュメントが存在しない場合
-                    targetDateEl.textContent = `対象日: データなし (デフォルト ${currentEventDay})`;
-                    targetDateEl.classList.add('text-red-500');
-                    console.warn("日付設定ドキュメントが見つかりません。デフォルト値を使用します。");
-                }
-            }, (error) => {
-                // 日付設定の購読エラー
-                targetDateEl.textContent = `対象日: 取得失敗 🚨`;
-                targetDateEl.classList.add('text-red-500');
-                console.error("日付設定の購読エラー:", error);
-            });
-
-
-            // --- B. 集計サマリーのリアルタイム監視 ---
-            onSnapshot(summaryDocRef(db), (doc) => {
-                if (doc.exists()) {
-                    const data = doc.data();
-                    const currentCount = data.current_count || 0;
-                    
-                    // 1. 場内人数
-                    currentCountValueEl.textContent = currentCount.toLocaleString();
-
-                    // 2. 来場者数
-                    const day1 = data.day1_total_visitors || 0; 
-                    const day2 = data.day2_total_visitors || 0;
-                    
-                    totalVisitorsEl.textContent = `1日目: ${day1.toLocaleString()}人 2日目: ${day2.toLocaleString()}人`;
-
-                    // 3. 待ち時間
-                    let waitTime = Math.max(0, Math.floor(currentCount / 50) * 5); // 50人ごとに5分追加
-                    waitTimeValueEl.textContent = `${waitTime}分`;
-                } else {
-                    currentCountValueEl.textContent = '0';
-                    totalVisitorsEl.textContent = '1日目: 0人 2日目: 0人';
-                    waitTimeValueEl.textContent = '--分';
-                }
-            }, (error) => {
-                // 集計データの購読エラー
-                if (error.message.includes("permission")) {
-                    statusElement.textContent = '🚨 データ取得失敗: Firestoreセキュリティルールを確認してください。';
-                    console.error("Firestore Permission Error:", error);
-                } else {
-                    statusElement.textContent = `🚨 データ取得エラー: ${error.message.substring(0, 50)}...`;
-                    console.error("Data Listener Error:", error);
-                }
-                currentCountValueEl.textContent = '取得失敗';
-            });
-        }
-
-        // ----------------------------------------------------
-        // 3. カウンター機能 (ログ書き込み)
-        // ----------------------------------------------------
-        
-        // ユーティリティ: エラー表示
-        function displayError(message) {
-            console.error(message);
-            statusElement.textContent = `🚨 エラー: ${message.substring(0, 50)}...`;
-            // アニメーション解除
-            currentCountValueEl.classList.remove('updating');
-            isProcessing = false;
-        }
-
-        // ユーティリティ: カウンターボタンの操作関数
-        window.handleButtonClick = async function(count = 1) {
-            if (isProcessing) {
-                statusElement.textContent = '処理中です...';
-                return;
-            }
-            
-            // 🚨 認証が失敗している場合、処理を中断
-            if (!userId) {
-                statusElement.textContent = '🚨 認証が未完了のため、記録できません。ページをリロードしてください。';
-                return;
-            }
-
-            isProcessing = true;
-            const countButtons = document.querySelectorAll('#in-btn, .multi-count-btn');
-
-            // 1. UIの更新（暫定値とアニメーション）
-            countButtons.forEach(btn => btn.disabled = true);
-            statusElement.textContent = `入場 (+${count}人) を記録中...`;
-
-            // 暫定的な場内人数表示更新
-            const currentCountText = currentCountValueEl.textContent;
-            const currentCount = parseInt(currentCountText.replace(/[,\u3000-]/g, ''), 10) || 0;
-            const newCount = Math.max(0, currentCount + count); 
-            
-            currentCountValueEl.textContent = newCount.toLocaleString();
-            currentCountValueEl.classList.add('updating'); 
-
-            try {
-                // ログの書き込み
-                const logData = {
-                    type: 'in', // 入場専用
-                    count: count, 
-                    timestamp: serverTimestamp(), // Firestore側で正確な時刻を記録
-                    recorded_by_uid: userId,
-                    event_day: currentEventDay, // リアルタイムに取得した日付設定を反映
-                };
-                
-                // ログコレクションに追加
-                await addDoc(collection(db, LOG_COLLECTION_PATH), logData);
-
-                statusElement.textContent = `✅ 入場 (+${count}人) 記録完了！`;
-
-            } catch (error) {
-                // 権限エラーの場合、具体的なメッセージを出す
-                if (error.message.includes("permission")) {
-                    displayError('記録失敗: セキュリティルールにより書き込みが拒否されました。');
-                } else {
-                    displayError(`ログの記録に失敗しました: ${error.message}`);
-                }
-            } finally {
-                // ボタンを再有効化し、アニメーションを解除
-                setTimeout(() => {
-                    countButtons.forEach(btn => btn.disabled = false);
-                    isProcessing = false;
-                    currentCountValueEl.classList.remove('updating');
-                    // リアルタイムリスナーが最終的な値を更新するのを待つ
-                }, 500);
-            }
-        }
-
-        // ----------------------------------------------------
-        // 4. アプリケーション開始
-        // ----------------------------------------------------
-        async function initializeAppAndAuth() {
-            // UIの初期メッセージ
-            statusElement.textContent = 'システム初期化中...';
-
-            try {
-                // Configはフォールバックロジックにより必ず存在するため、ここでConfigの有無チェックは行わない
-                
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // 認証
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                // 認証成功時
-                if (auth.currentUser) {
-                    userId = auth.currentUser.uid;
-                    // 完全なUIDは長いため、最初の8文字のみ表示（管理者のみが完全なIDを使用）
-                    statusElement.textContent = `接続成功。ユーザーID: ${userId.substring(0, 8)}...`;
-                    
-                    // 認証後、リアルタイムリスナーを開始
-                    setupRealtimeListener(db);
-                } else {
-                    throw new Error("User authentication failed and currentUser is null.");
-                }
-                
-            } catch (e) {
-                let errorMessage = `Firebase初期化または認証エラー: ${e.message}`;
-                displayError(errorMessage);
-                userId = null; 
-            }
-        }
-
-        // アプリケーションの開始
-        window.onload = initializeAppAndAuth;
-    </script>
-
-    <header class="header-container">
-        <div class="qr-code-area">
-            <!-- QRコードのモック: Firebaseでは動的に生成されないため、プレースホルダーを使用 -->
-            <img id="qr-image" 
-                         src='https://placehold.co/150x150/FFFFFF/AAAAAA?text=QR+Code' 
-                         alt="QR Code" 
-                         onerror="this.src='https://placehold.co/150x150/FFFFFF/AAAAAA?text=QR+Code'" 
-            > 
-        </div>
-
-        <div class="info-area">
-            <!-- 対象日の初期値は、JSで上書きされるまでプレースホルダーとする -->
-            <div id="target-date">対象日: ---</div> 
-            <div id="current-count-display">場内人数: <span id="current-count-value">0</span></div>
-            <div id="wait-time-display">100人当たり待ち時間: <span id="wait-time-value">--分</span></div>
-            <div class="total-visitors">
-                1日目: 0人 2日目: 0人
+            <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0">
+                <div class="flex flex-col items-end text-sm">
+                    <div id="current-date-time" class="font-medium whitespace-nowrap opacity-90">現在日時: --/-- --:--:--</div>
+                    <div id="event-date-summary" class="font-light whitespace-nowrap opacity-80 mt-0.5">
+                        <span id="target-date">イベント日: </span>
+                        Day1(<span id="event-day1-date">未設定</span>) / Day2(<span id="event-day2-date">未設定</span>)
+                    </div>
+                </div>
+                <div id="current-count-display" class="text-4xl md:text-5xl font-extrabold flex items-center justify-end">
+                    場内人数: 
+                    <span id="current-count-value" class="ml-2 text-yellow-400 tabular-nums">0</span>
+                </div>
+                <div class="w-full text-right text-xs md:text-sm space-y-0.5 opacity-90 pt-2 border-t border-cyan-400/50">
+                    <div id="wait-time-display" class="font-light">
+                        100人当たり待ち時間: <span id="wait-time-value" class="font-bold">--</span>分
+                    </div>
+                    <div class="total-visitors font-light">
+                        総入場者数: Day1<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 Day2<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
-    <div id="main-content">
-        <!-- handleButtonClick(count) の引数はカウント数のみに変更 -->
-        <button id="in-btn" class="count-button" onclick="handleButtonClick(1)">+1</button>
-        
-        <div class="multi-count-group">
-            <button id="in-btn-5" class="multi-count-btn" onclick="handleButtonClick(5)">+5</button>
-            <button id="in-btn-10" class="multi-count-btn" onclick="handleButtonClick(10)">+10</button>
+    <!-- 以下は counter.html 固有のコンテンツ -->
+    <main class="main-content">
+        <div class="max-w-md mx-auto mt-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">入場カウンター</h1>
+            <div class="flex justify-center gap-6">
+                <button id="add-in-btn" class="bg-green-in text-white px-8 py-4 rounded-2xl text-xl font-bold shadow-md hover:bg-green-700 transition">＋ 入場</button>
+                <button id="remove-in-btn" class="bg-gray-400 text-white px-8 py-4 rounded-2xl text-xl font-bold shadow-md hover:bg-gray-600 transition">－ 修正</button>
+            </div>
         </div>
-        
-        <div id="status">システム初期化中...</div>
-    </div>
+    </main>
 
-    <div class="back-button-container">
-        <!-- メニューページへのリンクは、index.htmlへ遷移するように固定 -->
-        <a href="./index.html" class="back-button">メニューへ戻る</a>
-    </div>
+    <!-- ✅ Firebase共通ヘッダーと同一ロジック -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase設定（index.htmlと共通）
+        const firebaseConfig = {
+            apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+            authDomain: "setapanmarketcounter.firebaseapp.com",
+            projectId: "setapanmarketcounter",
+            storageBucket: "setapanmarketcounter.firebasestorage.app",
+            messagingSenderId: "546423839721",
+            appId: "1:546423839721:web:70d5c12129fe6cc1594978"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const currentDateEl = document.getElementById('current-date-time');
+        const eventDay1DateEl = document.getElementById('event-day1-date');
+        const eventDay2DateEl = document.getElementById('event-day2-date');
+        const currentCountValueEl = document.getElementById('current-count-value');
+        const day1VisitorsEl = document.getElementById('day1-visitors');
+        const day2VisitorsEl = document.getElementById('day2-visitors');
+        const waitTimeValueEl = document.getElementById('wait-time-value');
+
+        // 共通のリアルタイム時計
+        function updateCurrentDateTime() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
+            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' });
+            currentDateEl.textContent = `現在日時: ${dateStr} ${timeStr}`;
+        }
+        setInterval(updateCurrentDateTime, 1000);
+        updateCurrentDateTime();
+
+        // Firestore購読（index.htmlと同じ）
+        const getPublicCollectionPath = (collectionName) => `/artifacts/setapanmarketcounter/public/data/${collectionName}`;
+        const getDayDocRef = (db) => doc(db, getPublicCollectionPath('static'), 'day');
+        const getLogCollectionRef = (db) => collection(db, getPublicCollectionPath('log'));
+
+        async function initFirebase() {
+            setLogLevel('Debug');
+            await signInAnonymously(auth);
+            onAuthStateChanged(auth, (user) => {
+                if (!user) return;
+
+                // 日付設定
+                onSnapshot(getDayDocRef(db), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        eventDay1DateEl.textContent = new Date(data.day1.seconds * 1000).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
+                        eventDay2DateEl.textContent = new Date(data.day2.seconds * 1000).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
+                    }
+                });
+
+                // ログ監視
+                onSnapshot(getLogCollectionRef(db), (snapshot) => {
+                    let count = 0, day1 = 0, day2 = 0;
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.type === 'in') {
+                            count += data.count || 1;
+                            if (data.event_day === 'day1') day1 += data.count || 1;
+                            if (data.event_day === 'day2') day2 += data.count || 1;
+                        } else if (data.type === 'out') {
+                            count -= data.count || 1;
+                        }
+                    });
+                    currentCountValueEl.textContent = Math.max(0, count).toLocaleString();
+                    day1VisitorsEl.textContent = day1.toLocaleString();
+                    day2VisitorsEl.textContent = day2.toLocaleString();
+                    waitTimeValueEl.textContent = Math.floor(count / 50) * 5;
+                });
+            });
+        }
+        initFirebase();
+
+        // 入場ボタン処理
+        document.getElementById('add-in-btn').addEventListener('click', async () => {
+            await addDoc(getLogCollectionRef(db), {
+                type: 'in',
+                count: 1,
+                event_day: 'day1',
+                timestamp: new Date()
+            });
+        });
+    </script>
 </body>
 </html>
