@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>トラブル等記録フォーム</title>
+    <!-- Tailwind CSS CDNの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKの読み込み -->
+    <script type="module">
+        // Firebase SDKのインポート
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, setLogLevel, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ----------------------------------------------------
+        // 1. Firebase設定とグローバル変数 (index.htmlから継承)
+        // ----------------------------------------------------
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Failed to parse __firebase_config:", e);
+            }
+        }
+
+        // 環境変数が利用できない場合、ユーザーから提供された設定を使用
+        if (!firebaseConfig) {
+            firebaseConfig = {
+                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+                authDomain: "setapanmarketcounter.firebaseapp.com",
+                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
+                projectId: "setapanmarketcounter",
+                storageBucket: "setapanmarketcounter.firebasestorage.app",
+                messagingSenderId: "546423839721",
+                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
+                measurementId: "G-70KHJ0P1P1"
+            };
+        }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        let userId = null;
+
+        // Firestoreのパス生成ヘルパー関数
+        function getLogCollectionRef(dbInstance) {
+            return collection(dbInstance, `/artifacts/${appId}/public/data/log`);
+        }
+
+        // ----------------------------------------------------
+        // 1. Firebase初期化と認証
+        // ----------------------------------------------------
+        async function initializeAppAndAuth() {
+            updateCurrentDateTime();
+            setInterval(updateCurrentDateTime, 1000); // 1秒ごとに時刻を更新
+
+            if (!firebaseConfig) {
+                currentCountValueEl.textContent = '致命的エラー';
+                console.error("致命的エラー: Firebase設定がロードできませんでした。");
+                return;
+            }
+
+            setLogLevel('Debug');
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        setupRealtimeListener();
+                    } else {
+                        console.log("匿名認証に失敗しました。");
+                        currentCountValueEl.textContent = '認証失敗';
+                    }
+                });
+                
+            } catch (e) {
+                console.error(`Firebase初期化または認証エラー: ${e.message}`);
+                currentCountValueEl.textContent = '初期化失敗';
+            }
+        }
+
+        window.onload = initializeAppAndAuth;
+
+        // ----------------------------------------------------
+        // 2. 出店者リスト定義 (GASのVENDOR_LISTを移植)
+        // ----------------------------------------------------
+        const VENDOR_LIST = {
+    'day1': [
+        '1. COBOTO BAKERY SHOP', '2. BAKE (両日)', '3. KIN-KIN', '4. CNN', '5. パン焼き小屋', '6. ドイツパンの店 リンデ', 
+        '7. KIN-KIN', '8. パン焼き小屋', '9. もくもくベーカリー', '10. 川越ベーカリー楽楽', '11. BAKE STORE (両日)', 
+        '12. 万世かつサンド コロッケ (両日)', '13. モンテカミエーノ', '14. MOGMOG BREAD (両日)', '15. BAKE MANIA (両日)', 
+        '16. Manhattans Bakery & Wine (両日)', '17. KIYOKA MORIMOTO (両日)', '18. Sun lu san (両日)', '19. GOPAN GINZA (両日)', 
+        '20. PATTISSERIE (両日)', '21. ブリアン', '22. グルメシティ (両日)', '23. BAKER\'S PLACE (両日)', '24. CUBE THE BAKERY (両日)', 
+        '25. ロッカク (両日)', '26. 高久パン (両日)', '27. パン工房 (両日)', '28. COEUR DE COEUR (両日)', '29. COELU (両日)', 
+        '30. ドミニク・サ (両日)', '31. ぼんやり光 (両日)', 
+        '32. セレクトパン by 日本パンデコレーター協会 (両日)', 
+        '33. ベストブレッドコンテスト (両日)', 
+        '34. JPCA (両日)', '35. JPCA (両日)', '36. JPCA (両日)',
+        '37. GREEN THUMB (両日)',
+        '38. BoulangerieECLIN (両日)',
+        '39. ブレッドパーク (両日)',
+        '40. 自然素材の米粉パン・スイーツ専門店 IYOTO (両日)', '41. Cocorire (両日)', '42. アトランジェリーエ豆の上のシェリー (両日)', 
+        '43. ベーカリーハチパン (両日)', '44. BoulangerieLAFI (両日)', '45. GOHAN & CO. (両日)', 
+        '46. デリシャスガーデン コヴィヴィアリータ (両日)', '47. 米粉パン CUBREAD (両日)', '48. 本当の梅干し (両日)', 
+        '49. MONICA (両日)', 
+        // 50-56はデータなし
+        '57. アダムテック株式会社 (両日)', // 協賛 (既存)
+        '58. 東京建物', // 協賛 (既存)
+        '59. 日清製粉 (両日)', // 協賛 (既存)
+        '60. Flower Bakery ハルノカオリ', '61. BEYOND SWEETS (両日)', '62. ドレスアップチーズ (両日)', 
+        '63. KAKA\'S BASE (両日)', '64. KotoKoto bakery (両日)', '65. 自然の恵み・佐久間屋さん La-La-Be', 
+        '66. PLANET COMPANY (両日)', '67. KOTARO FARM (両日)', '68. 24s / 24frames per second (両日)', '69. M/A/M (両日)', 
+        '70. ル・ジャルダン・コロリ (両日)', '71. ぐーぐるぱん (studio maru©) (両日)', '72. 鎌倉麹 (両日)', 
+        '73. からだのめぐみはちみつ ジェックジェルク (両日)', '74. LOCAL SPOON (両日)', '75. K’s bakery (両日)', 
+        '76. はちべえ養蜂場 (両日)', '77. アトリエ・ド・フロマージュ BAOBAB TRADE', '78. 結城農場', '79. 世田谷ファームランド',
+        '80. 世田谷パン祭り公式グッズ (両日)', '81. BAKE STORE (両日)', 
+        '82. TOKYO COFFEE LAB. (両日)', // 協賛 (既存)
+        '83. Hitomi Doughnuts (両日)', '84. 台湾甜商店 (両日)', '85. TUTU', '86. Hi-Fo 台湾屋台緑茶 (両日)', 
+        '87. The Roast Beef (両日)', '88. BELLE BAKE with upcycle (両日)', '89. THE ROAST BEEF', '90. FARCRY BREWING', 
+        '91. SAKURA DROPS MAYAKA (両日)', '92. 333', '93. MAISON FARMER', '94. リンデンばうむ醸造所', 
+        '95. カレー風味スパイスマジック', '96. 池尻大橋 オオダガクリーニング', '97. COZY COFFEE (両日)', 
+        '98. モルツァコーヒー malt\'s coffee', '99. ACROSS THE RIVER (両日)', '100. カップパパ', '101. SunZding (両日)', 
+        '102. WHOLE COFFEE ROASTER (両日)', '103. COFFEE (両日)', '104. あめや (両日)', '105. とらたろう (両日)', 
+        '106. 珈琲とおやつ AZUMAYA', '107. 珈琲', '108. 百年珈琲 (両日)',
+        
+        // Day 1 (11/1 Sat.) のパン大学
+        '110. 世田谷パン大学当日受付ブース',
+        '111. 可愛いパンスタンプで世界にひとつだけのハンカチを作ろう',
+        '112. 紙漉きでつくる『パンカード』',
+        '113. 素焼き調粘土で『クロワッサン・ハニワ』づくり',
+        '114. 【自分だけのパンをつくろう】どうぶつパン張り子 絵付けワークショップ',
+        '115. 【顔はめ仮顔館】好きなパンに顔をはめよう！',
+        '116. おいしいサンドイッチを作るカードゲーム「ミセスサンドイッチ」であそぼう！',
+        '117. 【お子さんも参加OK】トースターで焼くパン柄プラ板キーホルダー作り',
+        '118. ソルトコーディネーター青山志穂さんに学ぶ～究極の塩バタートースト～',
+        '119. 風船無料配布 (先着1000名)',
+        '120. 好きな木を選んで作るオリジナルバターナイフ',
+        '121. -', 
+        
+        // Day 1 の協賛
+        '122. ソフトバンク成城学園前 (両日)',
+        //その他
+        'ご当地パン',
+        '予約パン受け取り',
+        'パンの図書館',
+        'HWV広場',
+        'HWV校門前駐輪場',
+        'HWV広場横駐輪場',
+        'パンマーケット待機列',
+        'コンテスト投票所',
+        '世田谷パンラジオ',
+        'インフォメーション',
+        'サーキュラーステーション',
+        '休憩スペース(さくら)',
+        '休憩スペース(かえで)',
+        '特設ステージ',
+        'いちょうトイレ',
+        'さくらトイレ',
+        'SL',
+        '平和資料館',
+        '公園管理事務所',
+        'バイク駐輪所',
+        'いちょうトイレ横駐輪場',
+        '洋弓場横駐輪場'
+    ],
+    'day2': [
+        '1. boulangerie oguni', '2. BAKE (両日)', '3. BAKERY HOKO', '4. ESSEN', '5. ESPAN', '6. 2582546 BAKERS', 
+        '7. PALAIS', '8. PALM', '9. boulangerie dingo', '10. pinatis', '11. Boulangerie', '12. BAKE STORE (両日)', 
+        '13. 万世かつサンド コロッケ (両日)', '14. boulangerie corron', '15. MOGMOG BREAD (両日)', '16. BAKE MANIA (両日)', 
+        '17. Manhattans Bakery & Wine (両日)', '18. KIYOKA MORIMOTO (両日)', '19. Sun lu san (両日)', '20. GOPAN GINZA (両日)', 
+        '21. Form to Me', '22. PATTISSERIE (両日)', '23. グルメシティ (両日)', '24. BAKER\'S PLACE (両日)', '25. CUBE THE BAKERY (両日)', 
+        '26. ロッカク (両日)', '27. 高久パン (両日)', '28. パン工房 (両日)', '29. COEUR DE COEUR (両日)', '30. COELU (両日)', 
+        '31. ドミニク・サ (両日)', 
+        '32. ぼんやり光 (両日)', '32. セレクトパン by 日本パンデコレーター協会 (両日)', 
+        '33. ベストブレッドコンテスト (両日)', 
+        '34. JPCA (両日)', '35. JPCA (両日)', '36. JPCA (両日)',
+        '37. GREEN THUMB (両日)',
+        '38. BoulangerieECLIN (両日)',
+        '39. ブレッドパーク (両日)',
+        '40. 自然素材の米粉パン・スイーツ専門店 IYOTO (両日)', '41. Cocorire (両日)', '42. アトランジェリーエ豆の上のシェリー (両日)', 
+        '43. ベーカリーハチパン (両日)', '44. BoulangerieLAFI (両日)', '45. GOHAN & CO. (両日)', 
+        '46. デリシャスガーデン コヴィヴィアリータ (両日)', '47. 米粉パン CUBREAD (両日)', '48. 本当の梅干し (両日)', 
+        '49. MONICA (両日)', '50. パティスリージョー', '51. ケーキとパン', '52. ホルンベーカリー', '53. ベーカリー', '54. パンの家', 
+        // 55-56はデータなし
+        '57. アダムテック株式会社 (両日)', // 協賛 (既存)
+        '58. 東京建物', // 協賛 (既存)
+        '59. 日清製粉 (両日)', // 協賛 (既存)
+        '61. BEYOND SWEETS (両日)', '62. ドレスアップチーズ (両日)', '63. SUNANI PEANUT BUTTER', '64. KAKA\'S BASE (両日)', 
+        '65. KotoKoto bakery (両日)', '66. PLANET COMPANY (両日)', '67. KOTARO FARM (両日)', '68. 24s / 24frames per second (両日)', 
+        '69. M/A/M (両日)', '70. ル・ジャルダン・コロリ (両日)', '71. ぐーぐるぱん (studio maru©) (両日)', '72. 鎌倉麹 (両日)', 
+        '73. からだのめぐみはちみつ ジェックジェルク (両日)', '74. LOCAL SPOON (両日)', '75. K’s bakery (両日)', 
+        '76. はちべえ養蜂場 (両日)', '77. MUTSU NATURAL GARDEN', '78. アトリエ・ド・フロマージュ', '79. 創作ジャム専門店', 
+        '80. 世田谷パン祭り公式グッズ (両日)', '81. ブレッドパーク', 
+        '82. TOKYO COFFEE LAB. (両日)', // 協賛 (既存)
+        '83. Hitomi Doughnuts (両日)', '84. 台湾甜商店 (両日)', '85. 後藤醸造', '86. Hi-Fo 台湾屋台緑茶 (両日)', 
+        '87. The Roast Beef (両日)', '88. BELLE BAKE with upcycle (両日)', '89. THE ROAST BEEF', '90. FARCRY BREWING', 
+        '91. SAKURA DROPS MAYAKA (両日)', '92. COFFEE', '93. MAISON FARMER', '94. リンデンばうむ醸造所', 
+        '95. カレー風味スパイスマジック', '96. 池尻大橋 オオダガクリーニング', '97. COZY COFFEE (両日)', 
+        '98. モルツァコーヒー', '99. ACROSS THE RIVER (両日)', '100. カップパパ', '101. SunZding (両日)', 
+        '102. WHOLE COFFEE ROASTER (両日)', '103. COFFEE (両日)', '104. あめや (両日)', '105. とらたろう (両日)', 
+        '106. 珈琲とおやつ AZUMAYA', '107. 珈琲', '108. 百年珈琲 (両日)',
+        
+        // Day 2 (11/2 Sun.) のパン大学
+        '110. 世田谷パン大学当日受付ブース',
+        '111. 可愛いパンスタンプで世界にひとつだけのハンカチを作ろう',
+        '112. 紙漉きでつくる『パンカード』',
+        '113. 素焼き調粘土で『クロワッサン・ハニワ』づくり',
+        '114. 【自分だけのパンをつくろう】どうぶつパン張り子 絵付けワークショップ',
+        '115. 【顔はめ仮顔館】好きなパンに顔をはめよう！',
+        '116. おいしいサンドイッチを作るカードゲーム「ミセスサンドイッチ」であそぼう！',
+        '117. 笑顔の魔法 ボリパン® でパン作り', // 💡 ここに二重引用符があり、HTMLエラーの原因
+        '118. ぱんとぉばしなしの会 限定復活 ～ B2D 木村達雄介シェフと味わうパンの時間～',
+        '119. 風船無料配布 (先着1000名)',
+        '120. 好きな木を選んで作るオリジナルバターナイフ',
+        '121. パン柄デザインをシルクスクリーン印刷でいろいろなものに刷りこんでみよう！',
+        
+        // Day 2 の協賛
+        '122. ソフトバンク成城学園前 (両日)', // 122.
+        //その他
+        'ご当地パン',
+        '予約パン受け取り',
+        'パンの図書館',
+        'HWV広場',
+        'HWV校門前駐輪場',
+        'HWV広場横駐輪場',
+        'パンマーケット待機列',
+        'コンテスト投票所',
+        '世田谷パンラジオ',
+        'インフォメーション',
+        'サーキュラーステーション',
+        '休憩スペース(さくら)',
+        '休憩スペース(かえで)',
+        '特設ステージ',
+        'いちょうトイレ',
+        'さくらトイレ',
+        'SL',
+        '平和資料館',
+        '公園管理事務所',
+        'バイク駐輪所',
+        'いちょうトイレ横駐輪場',
+        '洋弓場横駐輪場'
+    ]
+};
+        
+        // ----------------------------------------------------
+        // 3. 出店者リストのHTML生成ロジック (GASから移植)
+        // ----------------------------------------------------
+        /**
+         * 指定された日の出店者リストから <option> タグを生成し、ジャンルごとに <optgroup> でグループ化します。
+         * @param {string} dayStr - '1'または'2'。
+         * @return {string} HTMLオプションタグの文字列。
+         */
+        function generateVendorOptionsGrouped(dayStr) {
+            const list = VENDOR_LIST[`day${dayStr}`] || [];
+            let html = '';
+            
+            const groups = {
+                'パン・マーケット': [],
+                'パンのおとも': [],
+                'グッズ/フードドライブ': [],
+                'ドリンク＆フード': [],
+                'HWVとパン大学': [],
+                '協賛': [],
+                'その他': []
+            };
+            
+            list.forEach(fullName => {
+                const match = fullName.match(/^(\d+)\./);
+                const num = match ? parseInt(match[1]) : null;
+                
+                let category = 'その他';
+                
+                // GASの分類ロジック
+                if (num >= 1 && num <= 56) {
+                    category = 'パン・マーケット';
+                } else if (num >= 60 && num <= 79) {
+                    category = 'パンのおとも';
+                } else if (num >= 80 && num <= 81) {
+                    category = 'グッズ/フードドライブ';
+                } else if (num >= 83 && num <= 108) {
+                    category = 'ドリンク＆フード';
+                } else if ([57, 58, 59, 82, 109, 110, 111].includes(num) || fullName.includes('協賛')) {
+                     category = '協賛';
+                } else if (num >= 110 && num <= 122) {
+                    category = 'HWVとパン大学';
+                }
+                
+                // 存在しないカテゴリへの追加を防ぐ
+                if (groups[category]) {
+                    groups[category].push(fullName);
+                } else {
+                    groups['その他'].push(fullName);
+                }
+            });
+            
+            // HTMLの生成
+            for (const [label, items] of Object.entries(groups)) {
+                if (items.length > 0) {
+                    html += `<optgroup label="--- ${label} ---">`;
+                    items.forEach(fullName => {
+                        // 純粋な店舗名を取得 (value属性用)
+                        let pureName = fullName
+                            .replace(/^\d+\.\s*/, '')
+                            .replace(/\s\(両日\)$/, '')
+                            .replace(/ by 日本パンデコレーター協会/, '')
+                            .trim();
+                            
+                        // fullNameはドロップダウンに表示するテキスト
+                        html += `<option value="${pureName}">${fullName}</option>`;
+                    });
+                    html += `</optgroup>`;
+                }
+            }
+
+            return html;
+        }
+
+        // ----------------------------------------------------
+        // 4. Firestoreへのデータ記録ロジック (GASのrecordreportを移植)
+        // ----------------------------------------------------
+        /**
+         * 報告データをFirestoreに記録します。
+         * @param {Object} formData - フォームデータを含むオブジェクト
+         */
+        async function recordReport(formData) {
+            if (!db) {
+                console.error("Firestoreが初期化されていません。");
+                throw new Error("Firestoreが利用できません。");
+            }
+
+            // 報告種別に基づいてplace/contentを決定
+            let placeText = formData.place; 
+            let contentText = formData.content;
+
+            // 報告ログの形式を定義
+            const reportData = {
+                // 報告ログであることを示す固定のtype
+                type: formData.report_type, 
+                
+                // 場内人数集計で誤ってカウントされないようにcountは省略 (もし必要なら0を設定)
+                count: 0, 
+
+                // フォームからの報告はすべて同じevent_dayに紐づける (day1/day2)
+                event_day: `day${formData.event_day_selector}`, 
+                
+                // 発生時刻 (手動入力があればそれを、なければサーバータイムスタンプ)
+                timestamp: formData.timestamp ? new Date(formData.timestamp) : serverTimestamp(), 
+
+                // 新規フィールド
+                content: contentText,     // 報告内容（textarea）
+                place: placeText,         // 発生場所/対象（ラジオボタンの値）
+                reporter: formData.reporter.trim() || '匿名', // 報告者名（text input）
+                vendor_name: formData.place || '', // 出店者名 (select)
+
+                // 認証済みのユーザーID
+                user_id: userId,
+            };
+
+            // GASのロジックに近くなるように type（報告種別）を content に追加
+            // 例: content: "[出店者] - 内容..." のように整形する
+            reportData.content = `[${formData.report_type}] ${reportData.content}`;
+
+
+            // データ追加処理
+            const docRef = await addDoc(getLogCollectionRef(db), reportData);
+            
+            console.log("報告ログが記録されました。Document ID:", docRef.id);
+            return {
+                status: `報告「${formData.report_type}」を記録しました！`,
+                type: formData.report_type
+            };
+        }
+
+        // ----------------------------------------------------
+        // 5. DOM操作とイベントリスナー
+        // ----------------------------------------------------
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Firebase初期化を待つ
+            await initializeFirebase();
+
+            const form = document.getElementById('reportForm');
+            const statusEl = document.getElementById('status');
+            const recordBtn = document.getElementById('record-btn');
+            const daySelectors = document.querySelectorAll('input[name="event_day_selector"]');
+            const vendorSelect = document.getElementById('place');
+
+            // 1. 初期時刻設定
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('timestamp').value = now.toISOString().slice(0, 16);
+
+            // 2. 初期イベント日設定
+            // 実際の日付に基づいて初期選択日を決定するロジック（簡易版）
+            const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+            // GASの定数がないため、ここでは日付の比較は行わず、強制的に Day1 を初期選択とする
+            const initialEventDay = '1'; 
+            document.getElementById('daySelector' + initialEventDay).checked = true;
+            
+            // 3. リストの初期ロード
+            updateVendorList();
+
+            // 4. 対象日選択時のイベントリスナー
+            daySelectors.forEach(radio => {
+                radio.addEventListener('change', updateVendorList);
+            });
+
+            /** 選択された日と報告種別に応じて出店者リストを更新する */
+            function updateVendorList() {
+                const selectedDayEl = document.querySelector('input[name="event_day_selector"]:checked');
+                if (!selectedDayEl) return;
+                
+                const selectedDay = selectedDayEl.value;
+                
+                vendorSelect.disabled = true;
+                statusEl.innerText = `出店者リスト (Day ${selectedDay}) を読み込み中...`;
+                
+                try {
+                    // クライアント側でHTMLを生成
+                    const optionsHtml = generateVendorOptionsGrouped(selectedDay);
+                    vendorSelect.innerHTML = '<option value="">- 選択してください (任意) -</option>' + optionsHtml;
+                    vendorSelect.disabled = false;
+                    statusEl.innerText = 'リスト更新完了。';
+                } catch(error) {
+                    statusEl.innerText = 'エラー: リストの読み込みに失敗しました。';
+                    console.error("出店者リスト生成エラー:", error);
+                    vendorSelect.disabled = false;
+                }
+            }
+            
+            // 5. フォーム送信ロジック
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const typeEl = document.querySelector('input[name="report_type"]:checked');
+                const dayEl = document.querySelector('input[name="event_day_selector"]:checked');
+                
+                if (!typeEl || !dayEl) {
+                    showMessage('エラー: 報告種別と対象日を選択してください。', 'error');
+                    return;
+                }
+
+                // フォームデータの取得
+                const formData = {
+                    report_type: typeEl.value,
+                    event_day_selector: dayEl.value,
+                    content: document.getElementById('content').value.trim(), // 内容 (textarea)
+                    place: placeInput.value, // 発生場所/対象（text input）
+                    reporter: document.getElementById('reporter').value.trim(), // 報告者名（text input）
+                    timestamp: document.getElementById('timestamp').value // 発生時刻 (datetime-local)
+                };
+
+                if (!formData.content) {
+                    showMessage('エラー: 内容は必須です。', 'error');
+                    return;
+                }
+                
+                // ボタンを無効化してフィードバック
+                recordBtn.disabled = true;
+                showMessage('送信中...', 'info');
+
+                try {
+                    const result = await recordReport(formData);
+                    showMessage(`✅ ${result.status}`, 'success');
+                    
+                    // フォームをリセットし、時刻とリストを再設定
+                    form.reset();
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    document.getElementById('timestamp').value = now.toISOString().slice(0, 16);
+                    document.getElementById('daySelector' + initialEventDay).checked = true;
+                    updateVendorList(); // リストを初期状態に戻す
+                    
+                } catch (error) {
+                    console.error("Firestoreへの記録エラー:", error);
+                    showMessage('致命的なエラー: 記録に失敗しました。', 'error');
+                } finally {
+                    recordBtn.disabled = false;
+                }
+            });
+
+            /** ステータスメッセージを表示するヘルパー関数 */
+            function showMessage(message, type) {
+                statusEl.innerText = message;
+                statusEl.className = 'mt-3 text-center text-sm font-semibold p-2 rounded-lg';
+                if (type === 'success') {
+                    statusEl.classList.add('bg-green-100', 'text-green-800');
+                } else if (type === 'error') {
+                    statusEl.classList.add('bg-red-100', 'text-red-800');
+                } else {
+                    statusEl.classList.add('bg-blue-100', 'text-blue-800');
+                }
+            }
+        });
+
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen pt-4 pb-16 font-sans">
+
+    <div class="max-w-xl mx-auto px-4">
+        <h1 class="text-3xl font-extrabold text-red-600 text-center mb-6 border-b-4 border-red-600 pb-2 rounded-lg">
+            トラブル等記録フォーム
+        </h1>
+        
+        <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl">
+            <form id="reportForm">
+                
+                <!-- 報告種別 -->
+                <div class="mb-6">
+                    <label class="block text-xl font-bold text-gray-700 mb-3">報告種別 (必須):</label>
+                    <div class="flex flex-wrap justify-between gap-3">
+                        <label class="flex items-center text-lg cursor-pointer bg-red-50 hover:bg-red-100 p-3 rounded-xl flex-grow justify-center sm:flex-grow-0 transition duration-150 ease-in-out">
+                            <input type="radio" id="vendor" name="report_type" value="出店者" class="form-radio h-5 w-5 text-red-600 mr-2" required>
+                            <span class="font-medium">出店者</span>
+                        </label>
+                        <label class="flex items-center text-lg cursor-pointer bg-red-50 hover:bg-red-100 p-3 rounded-xl flex-grow justify-center sm:flex-grow-0 transition duration-150 ease-in-out">
+                            <input type="radio" id="visitor" name="report_type" value="来場者" class="form-radio h-5 w-5 text-red-600 mr-2">
+                            <span class="font-medium">来場者</span>
+                        </label>
+                        <label class="flex items-center text-lg cursor-pointer bg-red-50 hover:bg-red-100 p-3 rounded-xl flex-grow justify-center sm:flex-grow-0 transition duration-150 ease-in-out">
+                            <input type="radio" id="other" name="report_type" value="その他" class="form-radio h-5 w-5 text-red-600 mr-2">
+                            <span class="font-medium">その他</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 対象日 -->
+                <div class="mb-6">
+                    <label class="block text-xl font-bold text-gray-700 mb-3">対象日 (必須):</label>
+                    <div class="flex gap-10">
+                        <label class="flex items-center text-lg cursor-pointer">
+                            <input type="radio" id="daySelector1" name="event_day_selector" value="1" class="form-radio h-5 w-5 text-red-600 mr-2" required>
+                            <span class="font-medium">1日目</span>
+                        </label>
+                        <label class="flex items-center text-lg cursor-pointer">
+                            <input type="radio" id="daySelector2" name="event_day_selector" value="2" class="form-radio h-5 w-5 text-red-600 mr-2">
+                            <span class="font-medium">2日目</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 場所(プルダウン) -->
+                <div class="mb-6">
+                    <label for="place" class="block text-xl font-bold text-gray-700 mb-2">出店者や場所(なければ内容に記載):</label> 
+                    <select id="place" name="place" class="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:border-red-500 focus:ring focus:ring-red-500 focus:ring-opacity-50 text-base">
+                        <option value="">- 選択してください (任意) -</option>
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+                
+                <!-- 報告者名 -->
+                <div class="mb-6">
+                    <label for="reporter" class="block text-xl font-bold text-gray-700 mb-2">報告者名 (任意):</label>
+                    <input type="text" id="reporter" name="reporter" required placeholder="例: 担当者名、スタッフA" class="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:border-red-500 focus:ring focus:ring-red-500 focus:ring-opacity-50 text-base">
+                </div>
+
+                <!-- 内容 -->
+                <div class="mb-6">
+                    <label for="content" class="block text-xl font-bold text-gray-700 mb-2">内容 (必須):</label>
+                    <textarea id="content" name="content" required placeholder="具体的な状況を記載してください" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:border-red-500 focus:ring focus:ring-red-500 focus:ring-opacity-50 text-base resize-y"></textarea>
+                </div>
+                
+                <!-- 発生時刻 -->
+                <div class="mb-8">
+                    <label for="timestamp" class="block text-xl font-bold text-gray-700 mb-2">発生時刻 (任意):</label>
+                    <input type="datetime-local" id="timestamp" name="timestamp" class="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:border-red-500 focus:ring focus:ring-red-500 focus:ring-opacity-50 text-base">
+                </div>
+                
+                <!-- ステータス表示 -->
+                <div id="status" class="mt-3 text-center text-sm font-semibold p-2 rounded-lg min-h-8"></div>
+                
+                <!-- 記録ボタン -->
+                <button type="submit" id="record-btn" class="w-full py-4 bg-red-600 text-white text-2xl font-bold rounded-xl shadow-lg hover:bg-red-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
+                    記録する
+                </button>
+            </form>
+        </div>
+
+        <!-- メニューへ戻るボタン (固定パス/index.htmlに戻ることを想定) -->
+        <a href="index.html" class="block w-full py-3 mt-6 text-center text-lg font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl shadow hover:bg-gray-100 transition duration-200">
+            メニューへ戻る
+        </a>
+    </div>
+
+</body>
+</html>
