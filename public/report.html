@@ -387,14 +387,20 @@
         // 5. DOM操作とイベントリスナー
         // ----------------------------------------------------
         document.addEventListener('DOMContentLoaded', async () => {
-            // Firebase初期化を待つ
-            await initializeFirebase();
+            
+            const isFirebaseReady = await initializeFirebase();
+            if (!isFirebaseReady) {
+                document.getElementById('status').innerText = '初期化エラー: サービスを利用できません。';
+            }
 
             const form = document.getElementById('reportForm');
             const statusEl = document.getElementById('status');
             const recordBtn = document.getElementById('record-btn');
+            
+            // 💡 修正: DOM要素の参照を修正し、グローバル変数に格納
             const daySelectors = document.querySelectorAll('input[name="event_day_selector"]');
-            const vendorSelect = document.getElementById('place');
+            const reportTypeSelectors = document.querySelectorAll('input[name="report_type"]'); // 報告種別のラジオボタン
+            vendorSelect = document.getElementById('place'); // <select>要素をグローバル変数に格納
 
             // 1. 初期時刻設定
             const now = new Date();
@@ -402,34 +408,53 @@
             document.getElementById('timestamp').value = now.toISOString().slice(0, 16);
 
             // 2. 初期イベント日設定
-            // 実際の日付に基づいて初期選択日を決定するロジック（簡易版）
-            const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-            // GASの定数がないため、ここでは日付の比較は行わず、強制的に Day1 を初期選択とする
             const initialEventDay = '1'; 
             document.getElementById('daySelector' + initialEventDay).checked = true;
             
             // 3. リストの初期ロード
             updateVendorList();
 
-            // 4. 対象日選択時のイベントリスナー
+            // 4. 対象日および報告種別選択時のイベントリスナー
+            
+            // 対象日 (1日目/2日目) 選択時
             daySelectors.forEach(radio => {
+                radio.addEventListener('change', updateVendorList);
+            });
+            
+            // 💡 修正: 報告種別 (出店者/来場者/その他) 選択時にもリストを更新
+            reportTypeSelectors.forEach(radio => {
                 radio.addEventListener('change', updateVendorList);
             });
 
             /** 選択された日と報告種別に応じて出店者リストを更新する */
             function updateVendorList() {
                 const selectedDayEl = document.querySelector('input[name="event_day_selector"]:checked');
-                if (!selectedDayEl) return;
+                const selectedTypeEl = document.querySelector('input[name="report_type"]:checked'); // 報告種別を取得
+
+                if (!selectedDayEl) return; // 対象日未選択なら何もしない
                 
                 const selectedDay = selectedDayEl.value;
+                const selectedType = selectedTypeEl ? selectedTypeEl.value : null;
+
+                if (!selectedType) {
+                    vendorSelect.innerHTML = '<option value="">- 報告種別を選択してください -</option>';
+                    vendorSelect.disabled = true;
+                    return;
+                }
                 
                 vendorSelect.disabled = true;
-                statusEl.innerText = `出店者リスト (Day ${selectedDay}) を読み込み中...`;
+                statusEl.innerText = `リスト (Day ${selectedDay} / ${selectedType}) を読み込み中...`;
                 
                 try {
                     // クライアント側でHTMLを生成
-                    const optionsHtml = generateVendorOptionsGrouped(selectedDay);
-                    vendorSelect.innerHTML = '<option value="">- 選択してください (任意) -</option>' + optionsHtml;
+                    const optionsHtml = generateVendorOptionsGrouped(selectedDay, selectedType);
+                    
+                    // 💡 修正: 初期オプションのテキストを動的に変更
+                    const initialOptionText = (selectedType === '出店者') 
+                        ? '- 出店者を選択してください (任意) -' 
+                        : '- 場所を選択してください (任意) -';
+                        
+                    vendorSelect.innerHTML = `<option value="">${initialOptionText}</option>` + optionsHtml;
                     vendorSelect.disabled = false;
                     statusEl.innerText = 'リスト更新完了。';
                 } catch(error) {
@@ -456,7 +481,8 @@
                     report_type: typeEl.value,
                     event_day_selector: dayEl.value,
                     content: document.getElementById('content').value.trim(), // 内容 (textarea)
-                    place: placeInput.value, // 発生場所/対象（text input）
+                    // 💡 修正: placeInputではなく、vendorSelect (select要素) の値を取得
+                    place: vendorSelect.value, // 発生場所/対象（selectの値）
                     reporter: document.getElementById('reporter').value.trim(), // 報告者名（text input）
                     timestamp: document.getElementById('timestamp').value // 発生時刻 (datetime-local)
                 };
@@ -480,7 +506,8 @@
                     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
                     document.getElementById('timestamp').value = now.toISOString().slice(0, 16);
                     document.getElementById('daySelector' + initialEventDay).checked = true;
-                    updateVendorList(); // リストを初期状態に戻す
+                    // ラジオボタンの選択が解除されるため、改めてリストを更新
+                    updateVendorList(); 
                     
                 } catch (error) {
                     console.error("Firestoreへの記録エラー:", error);
