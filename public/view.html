@@ -64,17 +64,18 @@ import {
         const totalVisitorsEl = document.getElementById('total-visitors');
         const eventDay1DateEl = document.getElementById('event-day1-date');
         const eventDay2DateEl = document.getElementById('event-day2-date');
-        
+
+        const LOG_COLLECTION_PATH = `/artifacts/${appId}/public/data/log`;
         // データベースパス定義ヘルパー
-        const LOG_COLLECTION_PATH = (collectionName) => 
+        //const LOG_COLLECTION_PATH = (collectionName) => 
             // パス形式: /artifacts/setapanmarketcounter/public/data/{collectionName}
-            `artifacts/${appId}/public/data/${collectionName}`;
+           // `artifacts/${appId}/public/data/${collectionName}`;
 
-        const getDayDocRef = (dbInstance) => 
-            doc(dbInstance, LOG_COLLECTION_PATH('static'), 'day'); // static/day ドキュメントを参照
+        //const getDayDocRef = (dbInstance) => 
+       //     doc(dbInstance, LOG_COLLECTION_PATH('static'), 'day'); // static/day ドキュメントを参照
 
-        const getLogCollectionRef = (dbInstance) => 
-            collection(dbInstance, LOG_COLLECTION_PATH('log')); // log コレクションを参照
+        //const getLogCollectionRef = (dbInstance) => 
+           // collection(dbInstance, LOG_COLLECTION_PATH('log')); // log コレクションを参照
         
         let isAuthReady = false;
 
