@@ -40,7 +40,7 @@
                         // カスタムカラー
                         'green-in': '#00a040',
                         'red-out': '#e53935',
-                        'yellow-claim': '#ffc107',
+                        'yellow-report': '#ffc107',
                         'cyan-view': '#17a2b8',
                         'orange-calc': '#ff9800',
                     }
@@ -117,10 +117,10 @@
                 🔴 出口カウンター（退場 / 出口入場）
             </a>
             
-            <!-- 📝 3. トラブル等記録 (ファイル名: claim.html) -->
-            <a href="claim.html" 
-                id="claim-link" 
-                class="menu-link bg-yellow-claim hover:bg-yellow-500 text-gray-800 p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24">
+            <!-- 📝 3. トラブル等記録 (ファイル名: report.html) -->
+            <a href="report.html" 
+                id="report-link" 
+                class="menu-link bg-yellow-report hover:bg-yellow-500 text-gray-800 p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24">
                 📝 トラブル等記録
             </a>
             
@@ -365,6 +365,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
