@@ -78,7 +78,7 @@
         }
         #event-map {
             width: 100%;
-            height: auto;
+            height: auto; /* 高さを自動調整して画像をフル表示 */
             display: block;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -105,6 +105,7 @@
         </div>
 
         <label for="queue-length">行列の長さ（メートル）</label>
+        <!-- oninputでリアルタイムに計算を実行 -->
         <input type="number" id="queue-length" value="10" min="0" oninput="calculateWaitTime()">
         
         <h2>推定待ち時間</h2>
@@ -113,11 +114,11 @@
         </div>
 
         <div class="map-container">
-            <!-- プレースホルダー画像URLを使用 -->
+            <!-- プレースホルダー画像URLに修正 -->
             <img id="event-map" 
                  src='map.jpg' 
                  alt="イベント会場マップ">
-            <p class="text-xs text-gray-500 mt-2">※ 画像はプレースホルダーです。実際は会場マップが表示されます。</p>
+            <p class="text-xs text-gray-500 mt-2">※ 上の画像は行列の参照マップのプレースホルダーです。</p>
         </div>
 
         <button onclick="window.location.href='index.html'" class="back-button">
@@ -128,14 +129,11 @@
     <script type="module">
         // Firebase関連のインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // onAuthStateChanged をインポート
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // onSnapshot, setLogLevel をインポート
         import { getFirestore, collection, query, where, Timestamp, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- 定数 ---
-        // ユーザーの index.html ロジックに合わせ、ペース算出は固定30分間のログのみを対象とする
-        const PACE_WINDOW_MINUTES = 30; 
+        const PACE_WINDOW_MINUTES = 30; // ペース算出に使用する過去の時間枠（分）
         const MIN_PEOPLE_FOR_PACE = 3;  // ペース計算に必要な最小人数
         const DEFAULT_WAIT_TIME = 0;    // データ不足時のデフォルト待ち時間 (分)
         const PEOPLE_PER_METER = 2.5;   // 行列の密度: 1メートルあたり2.5人
@@ -229,9 +227,8 @@
         }
         
         /**
-         * 【修正】ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
-         * ユーザーのindex.htmlのロジック (固定30分間の平均ペース) を採用
-         * @param {Array<Object>} data - 過去30分間のログデータの配列 (onSnapshotでフィルタリング済み)
+         * ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
+         * @param {Array<Object>} data - 過去30分間のログデータの配列
          */
         function calculatePaceFromLogData(data) {
             let recentInCount = 0;
@@ -253,16 +250,14 @@
             }
 
             // 1. 1分あたりの入場ペース (人/分) を計算 (固定30分間で割る)
-            // (ユーザーのindex.htmlロジックに合わせるため、実際の時間幅ではなく固定の30分を使用)
             const entryRatePerMinute = recentInCount / PACE_WINDOW_MINUTES;
 
             // 2. 100人あたり待ち時間 (分) を計算
-            // 100 / (人/分) = 100 / (recentInCount / 30) = (100 * 30) / recentInCount = 3000 / recentInCount
             const waitTimePer100 = (100 * PACE_WINDOW_MINUTES) / recentInCount;
             
             return {
                 entryRate: entryRatePerMinute,
-                // 小数点以下を四捨五入して表示するため、計算結果も四捨五入
+                // 小数点以下を四捨五入して表示
                 waitTimePer100: Math.round(waitTimePer100) 
             };
         }
@@ -276,13 +271,13 @@
                 return;
             }
             
-            // 過去30分間のデータのみを取得するためのクエリ
+            // 過去30分間のデータのみを取得するためのクエリの開始時刻
             const windowStartTimestamp = Timestamp.fromDate(new Date(Date.now() - (PACE_WINDOW_MINUTES * 60 * 1000)));
 
-            // 公開コレクションへのパス
+            // 公開コレクションへのパス (counter.htmlが使用するパス)
             const logsRef = collection(db, `artifacts/${appId}/public/data/logs`);
             
-            // 複合インデックスエラーを避けるため、timestamp のフィルタのみを使用
+            // timestampでフィルタリング
             const q = query(
                 logsRef,
                 where('timestamp', '>=', windowStartTimestamp)
@@ -292,10 +287,10 @@
             onSnapshot(q, (snapshot) => {
                 logData = [];
                 snapshot.forEach(doc => {
-                    // toDate()がundefinedになる可能性があるため、チェックを追加
                     const data = doc.data();
+                    // FirestoreのTimestampオブジェクトがtoDate()メソッドを持っていることを確認
                     if (data.timestamp && data.timestamp.toDate) {
-                         logData.push(data);
+                           logData.push(data);
                     }
                 });
                 
