@@ -393,32 +393,32 @@
         // 日付選択変更のイベントリスナー (populateDateSelector内でセットアップ)
     });
     
-    // --- Firebase認証完了後に実行される初期化関数 (import scriptからコールされる) ---
-    window.externalAPI.initializeViewAfterAuth = initializeView;
-    window.externalAPI.onFailure = onFailure;
+    // // --- Firebase認証完了後に実行される初期化関数 (import scriptからコールされる) ---
+    // window.externalAPI.initializeViewAfterAuth = initializeView;
+    // window.externalAPI.onFailure = onFailure;
 
 
-    function setupAutoRefresh() {
-        if (autoRefreshTimer) {
-            clearInterval(autoRefreshTimer);
-        }
-        // 初回データ取得後、60秒ごとに drawChart を再実行
-        autoRefreshTimer = setInterval(() => {
-            const currentDate = dateSelector.value;
-            console.log(`[AutoRefresh] ${currentDate} のデータを再取得中...`);
-            drawChart(currentDate); 
-        }, refreshInterval);
-    }
+    // function setupAutoRefresh() {
+    //     if (autoRefreshTimer) {
+    //         clearInterval(autoRefreshTimer);
+    //     }
+    //     // 初回データ取得後、60秒ごとに drawChart を再実行
+    //     autoRefreshTimer = setInterval(() => {
+    //         const currentDate = dateSelector.value;
+    //         console.log(`[AutoRefresh] ${currentDate} のデータを再取得中...`);
+    //         drawChart(currentDate); 
+    //     }, refreshInterval);
+    // }
 
-    async function initializeView() {
-        try {
-            // Firebaseから日付リストを取得
-            const dates = await window.externalAPI.fetchRecordedDates();
-            populateDateSelector(dates);
-        } catch (error) {
-            onFailure(error);
-        }
-    }
+    // async function initializeView() {
+    //     try {
+    //         // Firebaseから日付リストを取得
+    //         const dates = await window.externalAPI.fetchRecordedDates();
+    //         populateDateSelector(dates);
+    //     } catch (error) {
+    //         onFailure(error);
+    //     }
+    // }
 
     function populateDateSelector(dates) {
         if (!Array.isArray(dates) || dates.length === 0) {
