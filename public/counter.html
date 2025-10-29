@@ -84,9 +84,9 @@
                 </div>
 
                 <!-- MIDDLE ROW: 場内人数 (最も大きく表示) -->
-                <div id="current-count-display" class="text-4xl md:text-5xl font-extrabold flex items-center justify-end">
+                <div id="current-count-display" class="text-lg md:text-lg font-extrabold flex items-center justify-end">
                     場内人数: 
-                    <span id="current-count-value" class="ml-2 text-yellow-400 tabular-nums">0</span>
+                    <span id="current-count-value" class="ml-2 text-4xl text-yellow-400 tabular-nums">0</span>
                 </div>
 
                 <!-- BOTTOM ROW: 来場者数サマリーと待ち時間 -->
@@ -95,7 +95,7 @@
                         100人当たり待ち時間: <span id="wait-time-value" class="font-bold">--</span>分
                     </div>
                     <div class="total-visitors font-light">
-                        総入場者数: Day1<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 Day2<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人
+                        Day1<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 Day2<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人
                     </div>
                 </div>
             </div>
@@ -407,6 +407,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
