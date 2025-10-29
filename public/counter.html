@@ -58,7 +58,6 @@
 </head>
 <body>
 
-    <!-- ヘッダーコンテナ (index.htmlから完全に継承) -->
     <header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
         <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
             
@@ -67,36 +66,34 @@
                 <img id="qr-code-image" 
                     src="qr.png" 
                     alt="QRコード画像をここに配置" 
-                    class="w-full h-full object-contain rounded"
+                    class="object-contain rounded w-full h-full"
                     onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
             </div>
 
-            <!-- 2. 情報エリア (右側) -->
-            <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0">
+            <!-- 2. 情報エリア (右側) - 表示内容をご要望に合わせて修正 -->
+            <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0 text-right">
                 
-                <!-- TOP ROW: メタデータ（リアルタイム日時 & イベント日）-->
-                <div class="flex flex-col items-end text-sm">
-                    <div id="current-date-time" class="font-medium whitespace-nowrap opacity-90">現在日時: --/-- --:--:--</div>
-                    <div id="event-date-summary" class="font-light whitespace-nowrap opacity-80 mt-0.5">
-                        <span id="target-date">イベント日: </span>
-                        Day1(<span id="event-day1-date">未設定</span>) / Day2(<span id="event-day2-date">未設定</span>)
-                    </div>
-                </div>
-
-                <!-- MIDDLE ROW: 場内人数 (最も大きく表示) -->
-                <div id="current-count-display" class="text-4xl md:text-5xl font-extrabold flex items-center justify-end">
+                <!-- TOP ROW: 場内人数 (最も大きく表示) -->
+                <div id="current-count-display" class="text-4xl md:text-5xl font-extrabold flex items-end justify-end">
+                    <!-- 場内人数:0 -->
                     場内人数: 
                     <span id="current-count-value" class="ml-2 text-yellow-400 tabular-nums">0</span>
                 </div>
 
-                <!-- BOTTOM ROW: 来場者数サマリーと待ち時間 -->
-                <div class="w-full text-right text-xs md:text-sm space-y-0.5 opacity-90 pt-2 border-t border-cyan-400/50">
-                    <div id="wait-time-display" class="font-light">
-                        100人当たり待ち時間: <span id="wait-time-value" class="font-bold">--</span>分
-                    </div>
-                    <div class="total-visitors font-light">
-                        総入場者数: Day1<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 Day2<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人
-                    </div>
+                <!-- MIDDLE ROW: 100人あたり待ち時間 -->
+                <div id="wait-time-display" class="w-full text-sm md:text-base font-light opacity-95">
+                    <!-- 100人当たり待ち時間: --分 -->
+                    100人当たり待ち時間: 
+                    <span id="wait-time-value" class="font-bold tabular-nums">--</span>分
+                </div>
+                
+                <!-- BOTTOM ROW: 入場者数サマリー (計:を含む表示) -->
+                <div class="w-full text-xs md:text-sm font-light opacity-90 pt-1 border-t border-cyan-400/50">
+                    <!-- 入場者数: Day(日付)10人 Day(日付)20人 計:30人 -->
+                    入場者数: 
+                    Day1(<span id="event-day1-date">--/--</span>)<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 
+                    Day2(<span id="event-day2-date">--/--</span>)<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人 
+                    計:<span class="font-bold ml-1 tabular-nums" id="total-visitors">0</span>人
                 </div>
             </div>
         </div>
@@ -407,6 +404,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
