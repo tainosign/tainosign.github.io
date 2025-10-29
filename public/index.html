@@ -314,8 +314,8 @@
             // --- C. リアルタイム時間による計算の更新 (New) ---
             // ログデータ自体に変化がなくても、30分間のローリングウィンドウを動かすために5秒ごとに再計算
             if (calculationInterval) clearInterval(calculationInterval);
-            calculationInterval = setInterval(updateCalculations, 5000); 
-            console.log("リアルタイム計算インターバルを開始しました (5秒ごと)。");
+            calculationInterval = setInterval(updateCalculations, 30000); 
+            console.log("リアルタイム計算インターバルを開始しました (30秒ごと)。");
         }
 
         // ----------------------------------------------------
@@ -365,3 +365,4 @@
     </script>
 </body>
 </html>
+
