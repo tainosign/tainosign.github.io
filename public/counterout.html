@@ -121,259 +121,272 @@
 
     <!-- Firebaseロジック -->
     <script type="module">
+        // Firebase SDKのインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, setLogLevel, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-      
 
-        firebaseConfig = {  
-            apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",  
-            authDomain: "setapanmarketcounter.firebaseapp.com",  
-            databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",  
-            projectId: "setapanmarketcounter",  
-            storageBucket: "setapanmarketcounter.firebasestorage.app",  
-            messagingSenderId: "546423839721",  
-            appId: "1:546423839721:web:70d5c12129fe6cc1594978",  
-            measurementId: "G-70KHJ0P1P1"  
-        };  
-    }  
+        // ----------------------------------------------------
+        // 1. Firebase設定とグローバル変数 (index.htmlから継承)
+        // ----------------------------------------------------
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Failed to parse __firebase_config:", e);
+            }
+        }
 
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter';   
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;  
+        // 環境変数が利用できない場合、ユーザーから提供された設定を使用
+        if (!firebaseConfig) {
+            firebaseConfig = {
+                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+                authDomain: "setapanmarketcounter.firebaseapp.com",
+                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
+                projectId: "setapanmarketcounter",
+                storageBucket: "setapanmarketcounter.firebasestorage.app",
+                messagingSenderId: "546423839721",
+                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
+                measurementId: "G-70KHJ0P1P1"
+            };
+        }
 
-    let db, auth;  
-    let userId = null;  
-    let daySettings = { day1: null, day2: null }; // 日付設定を保持  
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    // UI要素  
-    const currentCountValueEl = document.getElementById('current-count-value');  
-    const waitTimeValueEl = document.getElementById('wait-time-value');  
-    const day1VisitorsEl = document.getElementById('day1-visitors');  
-    const day2VisitorsEl = document.getElementById('day2-visitors');  
-    const eventDay1DateEl = document.getElementById('event-day1-date');  
-    const eventDay2DateEl = document.getElementById('event-day2-date');  
-    const currentDateEl = document.getElementById('current-date-time');  
-      
-    // データベースパス定義ヘルパー  
-    const getPublicCollectionPath = (collectionName) =>   
-        `/artifacts/${appId}/public/data/${collectionName}`;  
+        let db, auth;
+        let userId = null;
+        let daySettings = { day1: null, day2: null }; // 日付設定を保持
 
-    const getDayDocRef = (dbInstance) =>   
-        doc(dbInstance, getPublicCollectionPath('static'), 'day');   
+        // UI要素
+        const currentCountValueEl = document.getElementById('current-count-value');
+        const waitTimeValueEl = document.getElementById('wait-time-value');
+        const day1VisitorsEl = document.getElementById('day1-visitors');
+        const day2VisitorsEl = document.getElementById('day2-visitors');
+        const eventDay1DateEl = document.getElementById('event-day1-date');
+        const eventDay2DateEl = document.getElementById('event-day2-date');
+        const currentDateEl = document.getElementById('current-date-time');
+        
+        // データベースパス定義ヘルパー
+        const getPublicCollectionPath = (collectionName) => 
+            `/artifacts/${appId}/public/data/${collectionName}`;
 
-    const getLogCollectionRef = (dbInstance) =>   
-        collection(dbInstance, getPublicCollectionPath('log'));   
+        const getDayDocRef = (dbInstance) => 
+            doc(dbInstance, getPublicCollectionPath('static'), 'day'); 
 
-    // 日付フォーマットヘルパー (MM/DD形式)  
-    const formatDate = (timestamp) => {  
-        if (!timestamp) return '未設定';  
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);  
-        return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });  
-    };  
+        const getLogCollectionRef = (dbInstance) => 
+            collection(dbInstance, getPublicCollectionPath('log')); 
 
-    // リアルタイム現在日時を更新する関数 (秒単位まで表示)  
-    function updateCurrentDateTime() {  
-        const now = new Date();  
-        const dateStr = now.toLocaleDateString('ja-JP', {   
-            month: '2-digit',   
-            day: '2-digit',   
-            timeZone: 'Asia/Tokyo'   
-        });  
-        const timeStr = now.toLocaleTimeString('ja-JP', {   
-            hour: '2-digit',   
-            minute: '2-digit',   
-            second: '2-digit',   
-            hour12: false,   
-            timeZone: 'Asia/Tokyo'   
-        });  
-        currentDateEl.textContent = `現在日時: ${dateStr} ${timeStr}`;  
-    }  
-      
-    // ----------------------------------------------------  
-    // 2. リアルタイムデータリスナー (index.htmlから継承)  
-    // ----------------------------------------------------  
-    function setupRealtimeListener() {  
-        if (!db) {  
-            console.error("Firestoreインスタンスが利用できません。");  
-            return;  
-        }  
+        // 日付フォーマットヘルパー (MM/DD形式)
+        const formatDate = (timestamp) => {
+            if (!timestamp) return '未設定';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
+        };
 
-        // --- A. 日付設定の監視 (static/day) ---  
-        onSnapshot(getDayDocRef(db), (docSnap) => {  
-            if (docSnap.exists()) {  
-                daySettings = docSnap.data();  
-                eventDay1DateEl.textContent = formatDate(daySettings.day1);  
-                eventDay2DateEl.textContent = formatDate(daySettings.day2);  
-            } else {  
-                console.warn("日付設定ドキュメントが見つかりません。");  
-            }  
-        }, (error) => {  
-            console.error("日付設定の購読エラー:", error);  
-        });  
+        // リアルタイム現在日時を更新する関数 (秒単位まで表示)
+        function updateCurrentDateTime() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ja-JP', { 
+                month: '2-digit', 
+                day: '2-digit', 
+                timeZone: 'Asia/Tokyo' 
+            });
+            const timeStr = now.toLocaleTimeString('ja-JP', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false, 
+                timeZone: 'Asia/Tokyo' 
+            });
+            currentDateEl.textContent = `現在日時: ${dateStr} ${timeStr}`;
+        }
+        
+        // ----------------------------------------------------
+        // 2. リアルタイムデータリスナー (index.htmlから継承)
+        // ----------------------------------------------------
+        function setupRealtimeListener() {
+            if (!db) {
+                console.error("Firestoreインスタンスが利用できません。");
+                return;
+            }
 
-        // --- B. ログデータの監視と集計 (logコレクション) ---
+            // --- A. 日付設定の監視 (static/day) ---
+            onSnapshot(getDayDocRef(db), (docSnap) => {
+                if (docSnap.exists()) {
+                    daySettings = docSnap.data();
+                    eventDay1DateEl.textContent = formatDate(daySettings.day1);
+                    eventDay2DateEl.textContent = formatDate(daySettings.day2);
+                } else {
+                    console.warn("日付設定ドキュメントが見つかりません。");
+                }
+            }, (error) => {
+                console.error("日付設定の購読エラー:", error);
+            });
 
+            // --- B. ログデータの監視と集計 (logコレクション) ---
 // --- B. ログデータの監視と集計 (logコレクション) ---
 onSnapshot(getLogCollectionRef(db), (snapshot) => {
-let currentCount = 0;
-let day1TotalIn = 0;
-let day2TotalIn = 0;
+    let currentCount = 0;
+    let day1TotalIn = 0;
+    let day2TotalIn = 0;
 
-const now = new Date();  
-const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });  
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-// 🔹過去◯分（可変）を設定  
-const lookbackMinutes = 30; // ←ここを変えれば可変  
-const lookbackMs = lookbackMinutes * 60 * 1000;  
-const sinceTime = new Date(now.getTime() - lookbackMs);  
+    // 🔹過去◯分（可変）を設定
+    const lookbackMinutes = 30; // ←ここを変えれば可変
+    const lookbackMs = lookbackMinutes * 60 * 1000;
+    const sinceTime = new Date(now.getTime() - lookbackMs);
 
-let recentInCount = 0; // 過去30分間の入場数  
+    let recentInCount = 0; // 過去30分間の入場数
 
-snapshot.forEach(doc => {  
-    const data = doc.data();  
-    const type = data.type; // "in" or "out"  
-    const eventDay = data.event_day;  
-    const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;  
-    const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;  
-    if (!ts) return;  
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const type = data.type; // "in" or "out"
+        const eventDay = data.event_day;
+        const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
+        const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+        if (!ts) return;
 
-    const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });  
-    if (tsDateStr !== todayStr) return; // 当日以外は無視  
+        const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        if (tsDateStr !== todayStr) return; // 当日以外は無視
 
-    // 当日データを集計  
-    if (type === 'in') {  
-        currentCount += count;  
-        if (eventDay === 'day1') day1TotalIn += count;  
-        else if (eventDay === 'day2') day2TotalIn += count;  
+        // 当日データを集計
+        if (type === 'in') {
+            currentCount += count;
+            if (eventDay === 'day1') day1TotalIn += count;
+            else if (eventDay === 'day2') day2TotalIn += count;
 
-        // 🔹30分以内のデータをカウント  
-        if (ts >= sinceTime) recentInCount += count;  
-    } else if (type === 'out') {  
-        currentCount -= count;  
-    }  
-});  
+            // 🔹30分以内のデータをカウント
+            if (ts >= sinceTime) recentInCount += count;
+        } else if (type === 'out') {
+            currentCount -= count;
+        }
+    });
 
-// 🔹現在場内人数  
-currentCount = Math.max(0, currentCount);  
-currentCountValueEl.textContent = currentCount.toLocaleString();  
+    // 🔹現在場内人数
+    currentCount = Math.max(0, currentCount);
+    currentCountValueEl.textContent = currentCount.toLocaleString();
 
-// 🔹各日合計  
-day1VisitorsEl.textContent = day1TotalIn.toLocaleString();  
-day2VisitorsEl.textContent = day2TotalIn.toLocaleString();  
+    // 🔹各日合計
+    day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
+    day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
 
-// 🔹100人あたり待ち時間を算出  
-let waitTimeText = '--';  
-if (recentInCount > 0) {  
-    const timePer100 = 3000 / recentInCount; // 分単位  
-    waitTimeText = timePer100.toFixed(1); // 小数1桁  
-}  
-waitTimeValueEl.textContent = waitTimeText;
+    // 🔹100人あたり待ち時間を算出
+    let waitTimeText = '--';
+    if (recentInCount > 0) {
+        const timePer100 = 3000 / recentInCount; // 分単位
+        waitTimeText = timePer100.toFixed(1); // 小数1桁
+    }
+    waitTimeValueEl.textContent = waitTimeText;
 
 }, (error) => {
-console.error(ログデータ監視エラー: ${error.message});
-currentCountValueEl.textContent = 'データエラー';
-waitTimeValueEl.textContent = '--';
+    console.error(`ログデータ監視エラー: ${error.message}`);
+    currentCountValueEl.textContent = 'データエラー';
+    waitTimeValueEl.textContent = '--';
 });
-}
+        }
 
-// ----------------------------------------------------  
-    // 3. カウンター機能 (人数をログに記録)  
-    // ----------------------------------------------------  
-    window.logCount = async (type, count) => {  
-        if (!db || !userId) {  
-            console.error("Database not initialized or user not authenticated.");  
-            return;  
-        }  
+        // ----------------------------------------------------
+        // 3. カウンター機能 (人数をログに記録)
+        // ----------------------------------------------------
+        window.logCount = async (type, count) => {
+            if (!db || !userId) {
+                console.error("Database not initialized or user not authenticated.");
+                return;
+            }
 
-        // 現在の日付に基づいて event_day ('day1' or 'day2') を決定  
-        let eventDay = 'unknown';  
-        const now = new Date();  
-          
-        // daySettingsにTimestampオブジェクトがあればtoMillis()を使用  
-        const day1Timestamp = daySettings.day1 ? daySettings.day1.toMillis() : null;  
-        const day2Timestamp = daySettings.day2 ? daySettings.day2.toMillis() : null;  
+            // 現在の日付に基づいて event_day ('day1' or 'day2') を決定
+            let eventDay = 'unknown';
+            const now = new Date();
+            
+            // daySettingsにTimestampオブジェクトがあればtoMillis()を使用
+            const day1Timestamp = daySettings.day1 ? daySettings.day1.toMillis() : null;
+            const day2Timestamp = daySettings.day2 ? daySettings.day2.toMillis() : null;
 
-        if (day1Timestamp && now.getTime() >= day1Timestamp && (!day2Timestamp || now.getTime() < day2Timestamp)) {  
-            eventDay = 'day1';  
-        } else if (day2Timestamp && now.getTime() >= day2Timestamp) {  
-            eventDay = 'day2';  
-        }  
-          
-        const logEntry = {  
-            type: type, // 'in' or 'out'  
-            count: count,  
-            event_day: eventDay,  
-            timestamp: serverTimestamp(),  
-            user_id: userId,  
-            // GPS情報などもあれば追加可能  
-        };  
+            if (day1Timestamp && now.getTime() >= day1Timestamp && (!day2Timestamp || now.getTime() < day2Timestamp)) {
+                eventDay = 'day1';
+            } else if (day2Timestamp && now.getTime() >= day2Timestamp) {
+                eventDay = 'day2';
+            }
+            
+            const logEntry = {
+                type: type, // 'in' or 'out'
+                count: count,
+                event_day: eventDay,
+                timestamp: serverTimestamp(),
+                user_id: userId,
+                // GPS情報などもあれば追加可能
+            };
 
-        try {  
-            // logコレクションに新しいドキュメントを追加  
-            await addDoc(getLogCollectionRef(db), logEntry);  
-            console.log(`Log added: ${type} x ${count} on ${eventDay}`);  
-            // 成功時の視覚的なフィードバック (例: ボタンを短時間で点滅させるなど)  
-            flashButton(event);   
-        } catch (e) {  
-            console.error("Error writing log document:", e);  
-            // 失敗時のエラー表示を実装  
-        }  
-    };  
+            try {
+                // logコレクションに新しいドキュメントを追加
+                await addDoc(getLogCollectionRef(db), logEntry);
+                console.log(`Log added: ${type} x ${count} on ${eventDay}`);
+                // 成功時の視覚的なフィードバック (例: ボタンを短時間で点滅させるなど)
+                flashButton(event); 
+            } catch (e) {
+                console.error("Error writing log document:", e);
+                // 失敗時のエラー表示を実装
+            }
+        };
 
-    // ボタン押下時のフィードバック (例: 成功時)  
-    function flashButton(event) {  
-        const button = event.target.closest('button');  
-        if (button) {  
-            const originalBg = button.style.backgroundColor || button.className.match(/bg-[\w-]+/)[0];  
-            button.classList.add('animate-pulse');  
-            setTimeout(() => {  
-                button.classList.remove('animate-pulse');  
-            }, 300);  
-        }  
-    }  
-      
-    // ----------------------------------------------------  
-    // 4. 初期化処理 (index.htmlから継承)  
-    // ----------------------------------------------------  
-    async function initializeAppAndAuth() {  
-        updateCurrentDateTime();  
-        setInterval(updateCurrentDateTime, 1000); // 1秒ごとに時刻を更新  
+        // ボタン押下時のフィードバック (例: 成功時)
+        function flashButton(event) {
+            const button = event.target.closest('button');
+            if (button) {
+                const originalBg = button.style.backgroundColor || button.className.match(/bg-[\w-]+/)[0];
+                button.classList.add('animate-pulse');
+                setTimeout(() => {
+                    button.classList.remove('animate-pulse');
+                }, 300);
+            }
+        }
+        
+        // ----------------------------------------------------
+        // 4. 初期化処理 (index.htmlから継承)
+        // ----------------------------------------------------
+        async function initializeAppAndAuth() {
+            updateCurrentDateTime();
+            setInterval(updateCurrentDateTime, 1000); // 1秒ごとに時刻を更新
 
-        if (!firebaseConfig) {  
-            currentCountValueEl.textContent = '致命的エラー';  
-            console.error("致命的エラー: Firebase設定がロードできませんでした。");  
-            return;  
-        }  
+            if (!firebaseConfig) {
+                currentCountValueEl.textContent = '致命的エラー';
+                console.error("致命的エラー: Firebase設定がロードできませんでした。");
+                return;
+            }
 
-        setLogLevel('Debug');  
-        try {  
-            const app = initializeApp(firebaseConfig);  
-            db = getFirestore(app);  
-            auth = getAuth(app);  
-              
-            if (initialAuthToken) {  
-                await signInWithCustomToken(auth, initialAuthToken);  
-            } else {  
-                await signInAnonymously(auth);  
-            }  
-              
-            onAuthStateChanged(auth, (user) => {  
-                if (user) {  
-                    userId = user.uid;  
-                    setupRealtimeListener();  
-                } else {  
-                    console.log("匿名認証に失敗しました。");  
-                    currentCountValueEl.textContent = '認証失敗';  
-                }  
-            });  
-              
-        } catch (e) {  
-            console.error(`Firebase初期化または認証エラー: ${e.message}`);  
-            currentCountValueEl.textContent = '初期化失敗';  
-        }  
-    }  
+            setLogLevel('Debug');
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        setupRealtimeListener();
+                    } else {
+                        console.log("匿名認証に失敗しました。");
+                        currentCountValueEl.textContent = '認証失敗';
+                    }
+                });
+                
+            } catch (e) {
+                console.error(`Firebase初期化または認証エラー: ${e.message}`);
+                currentCountValueEl.textContent = '初期化失敗';
+            }
+        }
 
-    window.onload = initializeAppAndAuth;  
-</script>
+        window.onload = initializeAppAndAuth;
+    </script>
 </body>
                                </html>
