@@ -142,32 +142,37 @@ import {
          * Firestoreから記録された日付のリストを取得する（全件スキャンでユニーク化が必要なため非効率だが、GASロジックを再現）
          * @returns {Promise<string[]>} YYYY-MM-DD形式の日付の配列
          */
-        async function fetchRecordedDates() {
-            // 🚨 注意: Firestoreでユニークなフィールド値を取得するのは非推奨（全件スキャンが必要）。
-            // 実際の本番環境では、別途日付リストを保持するコレクションを作成することを推奨。
-            console.log("Firestore: 記録された日付リストを取得中...");
-            const dates = new Set();
-            try {
-                const q = query(collection(db, LOG_COLLECTION_PATH), orderBy("date", "desc"));
-                const querySnapshot = await getDocs(q);
 
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.date) {
-                        // dateフィールドがYYYY-MM-DD形式の文字列であることを想定
-                        dates.add(data.date);
-                    }
-                });
-                
-                const uniqueDates = Array.from(dates).sort().reverse();
-                console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
-                return uniqueDates;
+async function fetchRecordedDates() {
+    console.log("Firestore: 記録された日付リストを取得中...");
 
-            } catch (e) {
-                console.error("Firestore: 日付リストの取得に失敗しました", e);
-                throw new Error("日付リストの取得に失敗しました: " + e.message);
+    const dates = new Set();
+    try {
+        // ✅ log コレクションを直接参照
+        const logRef = collection(db, getPublicCollectionPath("log"));
+        const q = query(logRef, orderBy("timestamp", "desc")); // ✅ timestamp を使用
+
+        const querySnapshot = await getDocs(q);
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.timestamp) {
+                // ✅ timestamp → JS Date に変換して日付文字列にする
+                const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+                const dateStr = ts.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+                dates.add(dateStr);
             }
-        }
+        });
+
+        const uniqueDates = Array.from(dates).sort().reverse();
+        console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
+        return uniqueDates;
+
+    } catch (e) {
+        console.error("Firestore: 日付リストの取得に失敗しました", e);
+        throw new Error("日付リストの取得に失敗しました: " + e.message);
+    }
+}
         
         /**
          * 特定の日付の全ログを取得し、場内人数と報告件数を計算する
