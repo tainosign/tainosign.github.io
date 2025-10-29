@@ -12,7 +12,13 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+import {
+  getDocs,
+  query,
+  where,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
         // ----------------------------------------------------
         // 1. Firebase設定とグローバル変数
         // ----------------------------------------------------
@@ -62,7 +68,7 @@
         // データベースパス定義ヘルパー
         const LOG_COLLECTION_PATH = (collectionName) => 
             // パス形式: /artifacts/setapanmarketcounter/public/data/{collectionName}
-            `/artifacts/${appId}/public/data/${collectionName}`;
+            `artifacts/${appId}/public/data/${collectionName}`;
 
         const getDayDocRef = (dbInstance) => 
             doc(dbInstance, LOG_COLLECTION_PATH('static'), 'day'); // static/day ドキュメントを参照
