@@ -99,7 +99,7 @@
                 最新データを取得中...
             </div>
             <div id="pace-display" class="hidden">
-                現在の入場ペース: <span id="entry-rate" class="font-bold text-gray-800 tabular-nums">---</span> 人/分<br>
+                現在入場ペース: <span id="entry-rate" class="font-bold text-gray-800 tabular-nums">---</span> 人/分<br>
                 （参考: 100人あたり <span id="wait-time-100" class="font-bold text-gray-800 tabular-nums">---</span> 分待ち）
             </div>
         </div>
@@ -116,7 +116,8 @@
         <div class="map-container">
             <!-- プレースホルダー画像URLに修正 -->
             <img id="event-map" 
-                 src='map.jpg' 
+                 src="map.jpg" 
+                 onerror="this.src='https://placehold.co/500x300/e0e7ff/1f2937?text=会場マップ+Placeholder'"
                  alt="イベント会場マップ">
             <p class="text-xs text-gray-500 mt-2">※ 上の画像は行列の参照マップのプレースホルダーです。</p>
         </div>
@@ -130,7 +131,7 @@
         // Firebase関連のインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, Timestamp, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- 定数 ---
         const PACE_WINDOW_MINUTES = 30; // ペース算出に使用する過去の時間枠（分）
@@ -148,6 +149,7 @@
             }
         }
 
+        // フォールバック設定 (環境変数が利用できない場合の安全策)
         if (!firebaseConfig) {
             console.warn("環境変数__firebase_configが見つかりません。フォールバック設定を使用します。");
             firebaseConfig = {
@@ -162,6 +164,7 @@
             };
         }
 
+        // Canvas環境変数
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -170,6 +173,7 @@
         let isAuthReady = false; // 認証状態の準備完了フラグ
         let currentEntryRate = 0; // 1分あたりの入場ペース (計算結果を格納)
         let logData = []; // ログデータを保持 (onSnapshotでリアルタイム更新される)
+        let paceCalculationInterval = null; // ペース再計算用インターバル
 
         // --- UI要素 ---
         const queueLengthInput = document.getElementById('queue-length');
@@ -198,7 +202,13 @@
                 // 認証状態の監視と初期認証
                 return new Promise((resolve) => {
                     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-                        if (!user) {
+                        // 既に認証済み (または匿名/カスタム認証が成功した直後)
+                        if (user) {
+                            userId = user.uid || crypto.randomUUID();
+                            isAuthReady = true;
+                            unsubscribe(); // 初回認証完了後にリスナーを解除
+                            resolve(true);
+                        } else {
                             // 未認証の場合、カスタムトークンがあればサインインを試みる
                             if (initialAuthToken) {
                                 await signInWithCustomToken(auth, initialAuthToken).catch(e => console.error("Custom token sign-in failed:", e));
@@ -207,14 +217,7 @@
                                 await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
                             }
                             // onAuthStateChangedが再度呼ばれるので、ここでは何もしない
-                            return; 
                         }
-
-                        // 認証済み
-                        userId = user.uid || crypto.randomUUID();
-                        isAuthReady = true;
-                        unsubscribe(); // 初回認証完了後にリスナーを解除
-                        resolve(true);
                     }, (error) => {
                         console.error("Auth state change error:", error);
                         resolve(false);
@@ -228,20 +231,25 @@
         
         /**
          * ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
-         * @param {Array<Object>} data - 過去30分間のログデータの配列
+         * @param {Array<Object>} allLogData - Firestoreから取得したログデータの配列（全期間）
          */
-        function calculatePaceFromLogData(data) {
+        function calculatePace(allLogData) {
+            const now = Date.now();
+            const windowStartMs = now - (PACE_WINDOW_MINUTES * 60 * 1000); // 過去30分間の開始時刻 (ms)
             let recentInCount = 0;
             
-            // 過去30分間の入場数を合計する
-            for (const log of data) {
-                // typeが「入場」であり、countが有効な数値であるログのみをカウント
-                if (log.type === '入場' && typeof log.count === 'number' && log.count > 0) {
+            // 過去30分間の入場数を合計する (ローリングウィンドウのフィルタリング)
+            for (const log of allLogData) {
+                // timestampをDateオブジェクトに変換 (FirestoreのTimestampまたはISO文字列を想定)
+                const ts = log.timestamp?.toDate ? log.timestamp.toDate().getTime() : (typeof log.timestamp === 'number' ? log.timestamp : null);
+
+                // typeが「入場」であり、countが有効な数値であり、かつ過去30分以内であるログのみをカウント
+                if (ts !== null && ts >= windowStartMs && log.type === '入場' && typeof log.count === 'number' && log.count > 0) {
                     recentInCount += log.count;
                 }
             }
 
-            // 最小人数 (3人) に満たない場合は、データ不足としてペースをゼロとする
+            // 最小人数に満たない場合は、データ不足としてペースをゼロとする
             if (recentInCount < MIN_PEOPLE_FOR_PACE) { 
                 return { 
                     entryRate: 0, 
@@ -271,27 +279,19 @@
                 return;
             }
             
-            // 過去30分間のデータのみを取得するためのクエリの開始時刻
-            const windowStartTimestamp = Timestamp.fromDate(new Date(Date.now() - (PACE_WINDOW_MINUTES * 60 * 1000)));
-
-            // 公開コレクションへのパス (counter.htmlが使用するパス)
+            // 公開コレクションへのパス (logsコレクションを参照)
             const logsRef = collection(db, `artifacts/${appId}/public/data/logs`);
             
-            // timestampでフィルタリング
-            const q = query(
-                logsRef,
-                where('timestamp', '>=', windowStartTimestamp)
-            );
+            // **修正**: where句を削除し、全てのログを監視する。
+            // フィルタリングはJavaScript側で行うことでローリングウィンドウを実現する。
+            const q = query(logsRef); 
 
             // onSnapshotでリアルタイム監視を開始
             onSnapshot(q, (snapshot) => {
                 logData = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    // FirestoreのTimestampオブジェクトがtoDate()メソッドを持っていることを確認
-                    if (data.timestamp && data.timestamp.toDate) {
-                           logData.push(data);
-                    }
+                    logData.push(data);
                 });
                 
                 // データが更新されたら即座に計算を実行し、UIを更新
@@ -318,8 +318,8 @@
                 return;
             }
 
-            // ログデータから計算を実行
-            const { entryRate, waitTimePer100 } = calculatePaceFromLogData(logData);
+            // ログデータから計算を実行 (ローリングウィンドウフィルタリング込み)
+            const { entryRate, waitTimePer100 } = calculatePace(logData);
             currentEntryRate = entryRate;
 
             // UIを更新
@@ -348,7 +348,7 @@
             }
 
             // ペースが0（計算不能状態）の場合の表示を維持
-            if (currentEntryRate <= 0) {
+            if (currentEntryRate <= 0.01) { // ほぼ0の場合も計算不能とする
                 estimatedWaitTimeElement.innerText = '計算不能';
                 return;
             }
@@ -372,10 +372,16 @@
             if (isReady) {
                 // 認証完了後、リアルタイムリスナーを設定
                 setupRealtimeLogListener();
+
+                // ログデータ自体に変化がなくても、30分間のローリングウィンドウを動かすために30秒ごとに再計算
+                if (paceCalculationInterval) clearInterval(paceCalculationInterval);
+                paceCalculationInterval = setInterval(updatePaceUI, 30000);
+                console.log("リアルタイム計算インターバルを開始しました (30秒ごと)。");
             } else {
                 loadingStatusDiv.textContent = '🚨 Firebase接続エラー';
                 estimatedWaitTimeElement.innerText = 'エラー';
             }
+
             // 初期計算を実行し、入力値変更時も計算を再実行
             window.calculateWaitTime();
             queueLengthInput.addEventListener('input', window.calculateWaitTime);
