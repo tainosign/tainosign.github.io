@@ -239,6 +239,19 @@ async function fetchRecordedDates() {
                     if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
                     
                     complaintDetails = complaintDetails.trim() || null; 
+                    const complaintCount = complaintDetails ? 1 : 0;
+                    
+                    // グラフ用にデータを追加
+                    if (isCounted || complaintCount > 0) {
+                        chartData.push([
+                            formattedTimestamp.split(' ')[1], // 時刻部分 (HH:mm:ss) のみを使用
+                            currentCount,    
+                            complaintCount,   
+                            complaintDetails  
+                        ]);
+                    }
+                });
+                    
 async function fetchDailyCountTimeline(date) {
     console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
     let currentCount = 0;
