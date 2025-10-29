@@ -1,792 +1,754 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>場内人数・イベントログ推移リアルタイムビュー</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
+    <title>場内人数推移ビュー (Firebase Hosting)</title>
+    <!-- Chart.js and Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <style>
-        /* カスタムスタイル */
-        .font-['Inter'] { font-family: 'Inter', sans-serif; }
-        #chartContainer {
-            position: relative;
-            height: 100%;
-            min-height: 400px;
-        }
-        /* モーダル表示のためのスクロール禁止 */
-        .modal-open { overflow: hidden; }
-        /* グラフのキャンバス */
-        #chart_div { width: 100%; height: 100%; }
-        /* Chart.jsのX軸ラベルの改行対応 */
-        .chartjs-render-monitor { white-space: pre-wrap; }
-    </style>
-</head>
-<body class="bg-gray-50 font-['Inter']">
-
-    <!-- メインアプリケーションコンテナ -->
-    <div id="app" class="min-h-screen p-4 sm:p-6 lg:p-8">
-        <!-- コンテンツはJSで動的にロードされます -->
-    </div>
-
-    <!-- トラブル詳細モーダル -->
-    <div id="modalContainer" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4 transition-opacity duration-300 opacity-0" aria-modal="true" role="dialog">
-        <div id="modalContent" class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-transform duration-300 scale-95">
-            <div id="modalHeader" class="p-4 border-b border-gray-200 flex justify-between items-center bg-red-500 text-white">
-                <h3 id="modalTitle" class="text-lg font-bold"></h3>
-                <button onclick="closeModal()" class="text-white hover:text-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
-            <div id="modalDetails" class="p-6 max-h-[70vh] overflow-y-auto whitespace-pre-wrap text-gray-700 text-sm">
-                <!-- 詳細内容 -->
-            </div>
-            <div class="p-4 border-t border-gray-200 text-right">
-                <button
-                    onclick="closeModal()"
-                    class="px-6 py-2 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition duration-150"
-                >
-                    閉じる
-                </button>
-            </div>
-        </div>
-    </div>
-
-
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK Imports -->
     <script type="module">
-        // Firebase SDKのインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =========================================================================
-        // グローバル変数と初期設定
-        // =========================================================================
-
-        const firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config.length > 0 ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ----------------------------------------------------
+        // 1. Firebase設定とグローバル変数
+        // ----------------------------------------------------
         
-        // 状態管理変数 (React Stateの代替)
-        let db = null;
-        let auth = null;
-        let userId = null;
-        let rawLogData = [];
-        let datesList = [];
-        let timelineData = [];
-        let selectedDate = 'day2'; // 初期値は暫定的に 'day2' に設定
-        let aggregationUnit = 'second';
-        let isLoading = true;
-        let error = null;
-        let modalContent = null;
-        
-        let chartInstance = null;
-        let logUnsubscribe = null;
-
-        // =========================================================================
-        // データ集計ロジック (Reactコードから移植)
-        // =========================================================================
-
-        /**
-         * 単位名から表示ラベルを取得
-         */
-        const getUnitLabel = (unit) => {
-            return {
-                'second': '1秒', 'minute': '1分', 'ten-minutes': '10分',
-                'thirty-minutes': '30分', 'hour': '1時間'
-            }[unit];
-        };
-
-        /**
-         * 時刻ラベルの表示をフォーマット
-         */
-        const formatTimeLabel = (timeString, unit) => {
-            const parts = timeString.split(':');
-            const h = parts[0]; 
-            const m = parts[1]; 
-            const s = parts[2]; 
-
-            if (unit === 'second') {
-                // 1秒単位: 時\n分\n秒
-                return [h, m, s].join('\n'); 
-            } else if (unit === 'minute') {
-                // 1分単位: 時\n分
-                return [h, m].join('\n');
-            } else {
-                // 10分、30分、1時間単位: 時のみ、または時:分
-                return (parts.length > 1 && m !== '00') ? [h, m].join(':') : h;
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Failed to parse __firebase_config:", e);
             }
-        };
+        }
+
+        if (!firebaseConfig) {
+            console.warn("環境変数__firebase_configが見つかりません。フォールバック設定を使用します。");
+            firebaseConfig = {
+                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+                authDomain: "setapanmarketcounter.firebaseapp.com",
+                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
+                projectId: "setapanmarketcounter",
+                storageBucket: "setapanmarketcounter.firebasestorage.app",
+                messagingSenderId: "546423839721",
+                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
+                measurementId: "G-70KHJ0P1P1"
+            };
+        }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        let userId = null;
+        let daySettings = { day1: null, day2: null }; 
+        // ログデータを保持する変数 (リアルタイム処理のために必要)
+        let logData = []; 
+        let calculationInterval = null; // リアルタイム計算用インターバル
+
+        // UI要素
+        const currentCountValueEl = document.getElementById('current-count-value');
+        const waitTimeValueEl = document.getElementById('wait-time-value');
+        const day1VisitorsEl = document.getElementById('day1-visitors');
+        const day2VisitorsEl = document.getElementById('day2-visitors');
+        const totalVisitorsEl = document.getElementById('total-visitors');
+        const eventDay1DateEl = document.getElementById('event-day1-date');
+        const eventDay2DateEl = document.getElementById('event-day2-date');
+        
+        // データベースパス定義ヘルパー
+        const LOG_COLLECTION_PATH = (collectionName) => 
+            // パス形式: /artifacts/setapanmarketcounter/public/data/{collectionName}
+            `/artifacts/${appId}/public/data/${collectionName}`;
+
+        const getDayDocRef = (dbInstance) => 
+            doc(dbInstance, LOG_COLLECTION_PATH('static'), 'day'); // static/day ドキュメントを参照
+
+        const getLogCollectionRef = (dbInstance) => 
+            collection(dbInstance, LOG_COLLECTION_PATH('log')); // log コレクションを参照
+        
+        let isAuthReady = false;
+
+        // Firestoreのコレクションパス (Public Dataとして格納することを想定)
+        // 🚨 注意: 実際のデータスキーマに合わせて 'logs' の部分は調整してください。
+        // const LOG_COLLECTION_PATH = `artifacts/${appId}/public/data/log`; 
+
+        let isInitialized = false;
+
+        // Firebaseの初期化と認証
+        async function initializeFirebase() {
+            if (isInitialized) return;
+            isInitialized = true;
+            
+            try {
+                // Firebase初期化
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // 認証
+                await new Promise((resolve, reject) => {
+                    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+                        unsubscribe();
+                        if (user) {
+                            console.log("Firebase: 既存ユーザーで認証済み");
+                            userId = user.uid;
+                        } else if (initialAuthToken) {
+                            try {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                                userId = auth.currentUser.uid;
+                                console.log("Firebase: カスタムトークンで認証成功");
+                            } catch (e) {
+                                console.error("Firebase: カスタムトークン認証失敗", e);
+                                await signInAnonymously(auth);
+                                userId = auth.currentUser.uid;
+                                console.log("Firebase: 匿名認証にフォールバック");
+                            }
+                        } else {
+                            await signInAnonymously(auth);
+                            userId = auth.currentUser.uid;
+                            console.log("Firebase: 匿名認証成功");
+                        }
+                        isAuthReady = true;
+                        resolve();
+                    }, reject);
+                });
+
+                // 認証後にビューの初期化を開始
+                window.externalAPI.db = db; // グローバルスコープに公開
+                window.externalAPI.userId = userId;
+                window.externalAPI.LOG_COLLECTION_PATH = LOG_COLLECTION_PATH;
+                window.externalAPI.initializeViewAfterAuth(); 
+
+            } catch (e) {
+                console.error("Firebase初期化または認証エラー:", e);
+                window.externalAPI.onFailure({ message: `初期化エラー: ${e.message}` });
+            }
+        }
+
+        // --- 2. GAS関数を置き換えるFirestoreデータ取得ロジック ---
 
         /**
-         * データを指定された単位で集計
+         * Firestoreから記録された日付のリストを取得する（全件スキャンでユニーク化が必要なため非効率だが、GASロジックを再現）
+         * @returns {Promise<string[]>} YYYY-MM-DD形式の日付の配列
          */
-        const aggregateData = (data, unit) => {
-            if (unit === 'second') {
-                const labels = [];
-                const attendance = [];
-                const complaint = [];
-                const complaintMap = {};
+        async function fetchRecordedDates() {
+            // 🚨 注意: Firestoreでユニークなフィールド値を取得するのは非推奨（全件スキャンが必要）。
+            // 実際の本番環境では、別途日付リストを保持するコレクションを作成することを推奨。
+            console.log("Firestore: 記録された日付リストを取得中...");
+            const dates = new Set();
+            try {
+                const q = query(collection(db, LOG_COLLECTION_PATH), orderBy("date", "desc"));
+                const querySnapshot = await getDocs(q);
 
-                data.forEach(row => {
-                    const timePart = row.timestamp.split(' ')[1]; // HH:mm:ss
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.date) {
+                        // dateフィールドがYYYY-MM-DD形式の文字列であることを想定
+                        dates.add(data.date);
+                    }
+                });
+                
+                const uniqueDates = Array.from(dates).sort().reverse();
+                console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
+                return uniqueDates;
 
-                    labels.push(timePart);
-                    attendance.push(row.currentCount);
-                    complaint.push(row.complaintCount);
+            } catch (e) {
+                console.error("Firestore: 日付リストの取得に失敗しました", e);
+                throw new Error("日付リストの取得に失敗しました: " + e.message);
+            }
+        }
+        
+        /**
+         * 特定の日付の全ログを取得し、場内人数と報告件数を計算する
+         * @param {string} date YYYY-MM-DD形式の日付
+         * @returns {Promise<Array<Array<any>>>} グラフ描画用のデータ配列
+         */
+        async function fetchDailyCountTimeline(date) {
+            console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
+            let currentCount = 0;
+            const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
+            
+            try {
+                // dateフィールドが一致するドキュメントをtimestamp順に取得
+                const q = query(
+                    collection(db, LOG_COLLECTION_PATH),
+                    where("date", "==", date),
+                    orderBy("timestamp", "asc")
+                );
 
-                    if (row.complaintCount > 0 && row.complaintDetails) {
-                        complaintMap[timePart] = row.complaintDetails.replace(/\n/g, ' / ');
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    console.log(`Firestore: **${date}** のログデータは見つかりませんでした。`);
+                    return chartData;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const row = doc.data();
+                    
+                    // Firestore TimestampをJavaScript Dateオブジェクトに変換
+                    const timestampDate = row.timestamp ? row.timestamp.toDate() : new Date();
+                    
+                    // タイムスタンプを 'YYYY/MM/DD HH:mm:ss' 形式の文字列に変換
+                    const formattedTimestamp = timestampDate.toLocaleDateString('ja-JP', {
+                        year: 'numeric', month: '2-digit', day: '2-digit', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit', 
+                        hour12: false
+                    }).replace(/\//g, '/').replace(/ /g, ' ').replace(',', '');
+                    
+                    // --- 入退場計算 ---
+                    const entryCount = row.entry || 0;
+                    const exitCount = row.exit || 0;
+                    currentCount += (entryCount - exitCount);
+                    currentCount = Math.max(0, currentCount); // 人数は0未満にならない
+
+                    const isCounted = (entryCount > 0 || exitCount > 0);
+                    
+                    // --- 報告内容集約 ---
+                    const vendorDetails = row.vendorDetails || '';
+                    const visitorDetails = row.visitorDetails || '';
+                    const otherDetails = row.otherDetails || '';
+                    
+                    let complaintDetails = '';
+                    if (vendorDetails) complaintDetails += `[出店者] ${vendorDetails}\n`;
+                    if (visitorDetails) complaintDetails += `[来場者] ${visitorDetails}\n`;
+                    if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
+                    
+                    complaintDetails = complaintDetails.trim() || null; 
+                    const complaintCount = complaintDetails ? 1 : 0;
+                    
+                    // グラフ用にデータを追加
+                    if (isCounted || complaintCount > 0) {
+                        chartData.push([
+                            formattedTimestamp.split(' ')[1], // 時刻部分 (HH:mm:ss) のみを使用
+                            currentCount,    
+                            complaintCount,   
+                            complaintDetails  
+                        ]);
                     }
                 });
 
-                return { labels, attendance, complaint, complaintMap };
+                console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
+                return chartData;
+
+            } catch (e) {
+                console.error("Firestore: タイムラインデータの取得に失敗しました", e);
+                throw new Error("タイムラインデータの取得に失敗しました: " + e.message);
             }
+        }
+        
+        // --- 3. グローバルなAPIをエクスポートして、HTML側のスクリプトから呼び出せるようにする ---
+        window.externalAPI = {
+            initializeFirebase,
+            fetchRecordedDates,
+            fetchDailyCountTimeline,
+            db: null,
+            userId: null,
+            LOG_COLLECTION_PATH: null,
+            // 認証完了後にHTML側から呼ばれる関数 (HTML側で定義)
+            initializeViewAfterAuth: () => { /* プレースホルダー */ },
+            onFailure: () => { /* プレースホルダー */ }
+        };
+        
+        // ページロード時にFirebaseの初期化を開始
+        window.onload = initializeFirebase;
+    </script>
 
-            const intervalMinutes = {
-                'minute': 1,
-                'ten-minutes': 10,
-                'thirty-minutes': 30,
-                'hour': 60
-            }[unit];
+<style>
+    /* Tailwind CSSの有効化 */
+    @layer utilities {
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: #6c757d;
+            height: 100%;
+            text-align: center;
+        }
+    }
+</style>
+<script>
+    // Tailwind CSSの設定
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                },
+            },
+        },
+    }
+</script>
 
-            const aggregated = {};
+</head>
+<body class="bg-gray-100 font-sans p-0 m-0 min-h-screen">
+    <!-- モーダル（カスタムアラート） -->
+    <div id="modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50 transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-lg w-full transform transition-transform duration-300 scale-95">
+            <h3 class="text-xl font-bold mb-4 text-red-600 border-b pb-2">記録詳細</h3>
+            <pre id="modal-content" class="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed"></pre>
+            <div class="flex justify-end mt-6">
+                <button onclick="closeModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">閉じる</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container mx-auto max-w-screen-2xl px-4 py-6">
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-blue-600 mb-2">場内人数推移ビュー</h1>
+            <p class="text-gray-500">Firestore ログデータに基づきリアルタイムに更新されます</p>
+        </header>
 
-            data.forEach(row => {
-                const timestampString = row.timestamp;
-                const timestamp = new Date(timestampString.replace(/\//g, '-'));
+        <!-- グラフコンテナ -->
+        <div id="chart-container" class="w-full h-[75vh] min-h-[400px] bg-white rounded-xl shadow-lg mb-6 p-4">
+            <canvas id="chart_div" class="loading">
+                <p>Firebase認証とデータを取得中...</p>
+            </canvas>
+        </div>
 
-                if (isNaN(timestamp.getTime())) {
-                    console.error(`[AGGREGATE-TIME ERROR] 日時文字列の解析に失敗しました: ${timestampString}`);
-                    return;
-                }
+        <!-- 表示単位コントロール -->
+        <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+            <label class="block text-lg font-semibold text-gray-700 mb-3">表示単位:</label>
+            <div class="flex flex-wrap justify-between gap-2 unit-buttons-wrapper"> 
+                <button class="unit-btn flex-1 min-w-0 px-3 py-2 text-sm md:text-base border border-blue-500 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition active" data-unit="second">1秒</button>
+                <button class="unit-btn flex-1 min-w-0 px-3 py-2 text-sm md:text-base border border-blue-500 rounded-lg text-blue-500 hover:bg-blue-50 transition" data-unit="minute">1分</button>
+                <button class="unit-btn flex-1 min-w-0 px-3 py-2 text-sm md:text-base border border-blue-500 rounded-lg text-blue-500 hover:bg-blue-50 transition" data-unit="ten-minutes">10分</button>
+                <button class="unit-btn flex-1 min-w-0 px-3 py-2 text-sm md:text-base border border-blue-500 rounded-lg text-blue-500 hover:bg-blue-50 transition" data-unit="thirty-minutes">30分</button>
+                <button class="unit-btn flex-1 min-w-0 px-3 py-2 text-sm md:text-base border border-blue-500 rounded-lg text-blue-500 hover:bg-blue-50 transition" data-unit="hour">1時間</button>
+            </div>
+        </div>
 
-                const attendanceCount = row.currentCount;
-                const complaintCount = row.complaintCount;
-                const complaintDetails = row.complaintDetails;
+        <!-- 日付選択とステータス表示 -->
+        <div class="bg-white rounded-xl shadow-md p-4 mb-6 controls">
+            <label for="dateSelector" class="block text-lg font-semibold text-gray-700 mb-3">表示する日付を選択:</label>
+            <select id="dateSelector" class="p-3 border border-gray-300 rounded-lg w-full text-lg focus:ring-blue-500 focus:border-blue-500">
+                <!-- オプションはJSで追加されます -->
+            </select>
+            <div id="status" class="mt-4 text-gray-500 text-sm text-right"></div>
+        </div>
 
-                let hour = timestamp.getHours();
-                let minute = timestamp.getMinutes();
+        <!-- メニューへ戻るボタン (静的ページなのでリンクはなし) -->
+        <div class="text-center mb-8">
+            <button onclick="window.history.back()" class="w-full md:w-96 bg-gray-500 text-white px-6 py-3 text-lg rounded-lg hover:bg-gray-600 transition duration-150 shadow-lg">前の画面へ戻る</button>
+        </div>
 
-                minute = Math.floor(minute / intervalMinutes) * intervalMinutes;
+    </div>
 
-                const minuteStr = String(minute).padStart(2, '0');
-                const hourStr = String(hour).padStart(2, '0');
-                const key = `${hourStr}:${minuteStr}`; // HH:MM (集計キー)
+<script>
+    // --- 4. クライアントサイドのコアロジック ---
+    const dateSelector = document.getElementById('dateSelector');
+    const statusDiv = document.getElementById('status');
+    let myChart = null; 
+    let rawChartData = null; 
+    let currentUnit = 'second'; 
+    const refreshInterval = 60000; // 60秒ごとに更新
+    let autoRefreshTimer = null;
+    
+    // --- モーダル関数 (alert()の代わり) ---
+    function openModal(title, content) {
+        document.getElementById('modal-content').textContent = content;
+        document.querySelector('#modal h3').textContent = title;
+        const modal = document.getElementById('modal');
+        modal.classList.remove('hidden', 'opacity-0');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            document.querySelector('#modal > div').classList.remove('scale-95');
+        }, 10);
+    }
 
-                const fullTimeString = timestampString.split(' ')[1]; // HH:mm:ss
+    function closeModal() {
+        const modal = document.getElementById('modal');
+        document.querySelector('#modal > div').classList.add('scale-95');
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+    
+    // --- イベントリスナー設定 ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // 単位変更ボタンのイベントリスナー
+        document.querySelectorAll('.unit-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.unit-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-500', 'text-white');
+                    btn.classList.add('text-blue-500', 'hover:bg-blue-50');
+                });
+                this.classList.add('bg-blue-500', 'text-white');
+                this.classList.remove('text-blue-500', 'hover:bg-blue-50');
 
-                if (!aggregated[key]) {
-                    aggregated[key] = {
-                        lastAttendance: attendanceCount, 
-                        complaintSum: 0,
-                        complaintDetails: []
-                    };
-                } else {
-                    aggregated[key].lastAttendance = attendanceCount; 
-                }
-
-                aggregated[key].complaintSum += complaintCount;
-
-                if (complaintDetails) {
-                    aggregated[key].complaintDetails.push({
-                        time: fullTimeString.substring(0, 8), // HH:mm:ss
-                        detail: complaintDetails
-                    });
+                currentUnit = this.getAttribute('data-unit');
+                if (rawChartData) {
+                    processAndDrawChart(rawChartData);
                 }
             });
+        });
+        
+        // 日付選択変更のイベントリスナー (populateDateSelector内でセットアップ)
+    });
+    
+    // --- Firebase認証完了後に実行される初期化関数 (import scriptからコールされる) ---
+    window.externalAPI.initializeViewAfterAuth = initializeView;
+    window.externalAPI.onFailure = onFailure;
 
+
+    function setupAutoRefresh() {
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+        // 初回データ取得後、60秒ごとに drawChart を再実行
+        autoRefreshTimer = setInterval(() => {
+            const currentDate = dateSelector.value;
+            console.log(`[AutoRefresh] ${currentDate} のデータを再取得中...`);
+            drawChart(currentDate); 
+        }, refreshInterval);
+    }
+
+    async function initializeView() {
+        try {
+            // Firebaseから日付リストを取得
+            const dates = await window.externalAPI.fetchRecordedDates();
+            populateDateSelector(dates);
+        } catch (error) {
+            onFailure(error);
+        }
+    }
+
+    function populateDateSelector(dates) {
+        if (!Array.isArray(dates) || dates.length === 0) {
+            document.getElementById('chart_div').textContent = `カウントの記録がありません。`;
+            document.querySelector('.controls').classList.add('hidden');
+            document.querySelector('.unit-buttons-wrapper').parentNode.classList.add('hidden');
+            return;
+        }
+        
+        // 日付オプションの生成
+        dateSelector.innerHTML = '';
+        dates.forEach(date => {
+            const option = document.createElement('option');
+            option.value = date;
+            option.textContent = date;
+            dateSelector.appendChild(option);
+        });
+
+        // URLパラメータがあれば初期選択、なければ最新の日付を選択
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialDate = urlParams.get('date') || dates[0];
+        dateSelector.value = initialDate;
+        
+        // 日付選択変更イベントの設定
+        dateSelector.addEventListener('change', function() {
+            drawChart(dateSelector.value);
+        });
+
+        // 初回描画と自動更新の設定
+        drawChart(initialDate);
+        setupAutoRefresh();
+    }
+
+    async function drawChart(date) {
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        const container = document.getElementById('chart-container');
+        // canvas要素を再生成し、ロード中メッセージを表示
+        container.innerHTML = `<canvas id="chart_div" class="loading"><p>データを取得中...</p></canvas>`;
+
+        try {
+            // Firebaseからタイムラインデータを取得
+            const chartData = await window.externalAPI.fetchDailyCountTimeline(date);
+            onDataReceived(chartData);
+
+        } catch (error) {
+            onFailure(error);
+        }
+    }
+
+    function onDataReceived(chartData) {
+        rawChartData = chartData; 
+
+        const container = document.getElementById('chart-container');
+
+        if (!rawChartData || rawChartData.length <= 1) { 
+            container.innerHTML = `<canvas id="chart_div" class="loading"><p class="text-xl font-medium text-gray-600">**${dateSelector.value}** には入退場の記録がありません。</p></canvas>`;
+            return;
+        }
+
+        processAndDrawChart(rawChartData);
+    }
+
+    function processAndDrawChart(data) {
+        const aggregated = aggregateData(data, currentUnit);
+
+        const chartLabels = aggregated.labels;
+        const attendanceData = aggregated.attendance;
+        const complaintData = aggregated.complaint;
+        const complaintMap = aggregated.complaintMap;
+
+        const chartElement = document.getElementById('chart_div');
+        if (!chartElement) {
+            console.error(`[DOM ERROR] ID 'chart_div' の canvas 要素が見つかりません。`);
+            return;
+        }
+        const ctx = chartElement.getContext('2d');
+
+        if (myChart) {
+            myChart.destroy();
+        }
+        
+        try {
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: '場内人数',
+                            data: attendanceData,
+                            yAxisID: 'y1',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            tension: 0.2,
+                            fill: false,
+                            pointRadius: (currentUnit === 'second' || currentUnit === 'minute') ? 3 : 0 
+                        },
+                        {
+                            label: 'トラブル等記録件数',
+                            data: complaintData,
+                            yAxisID: 'y2',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                            type: 'bar',
+                            order: 1,
+                            pointRadius: 0,
+                            barPercentage: 0.8 
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 500 }, 
+                    onClick: (e) => {
+                        const activePoints = myChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+                        if (activePoints.length > 0) {
+                            const firstPoint = activePoints[0];
+                            const label = chartLabels[firstPoint.index];
+                            
+                            if (complaintMap[label]) {
+                                openModal(`【トラブル等記録内容 - ${dateSelector.value} ${label}】`, complaintMap[label]);
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${dateSelector.value} の場内/トラブル等記録推移 (${getUnitLabel(currentUnit)}単位)`,
+                            font: { size: 18 } 
+                        },
+                        legend: { 
+                            position: 'bottom',
+                            labels: { font: { size: 14 } } 
+                        },
+                        tooltip: {
+                            bodyFont: { size: 14 }, 
+                            titleFont: { size: 14 }
+                        }
+                    },
+                    scales: {
+                        y1: { 
+                            type: 'linear', position: 'left',
+                            title: { display: true, text: '場内人数', font: { size: 18 } }, 
+                            beginAtZero: true,
+                            ticks: { font: { size: 14 } } 
+                        },
+                        y2: { 
+                            type: 'linear', position: 'right',
+                            title: { display: true, text: 'トラブル等件数 (集計)', font: { size: 18 } }, 
+                            min: 0,
+                            max: Math.ceil(Math.max(1, ...complaintData) * 1.1), 
+                            grid: { drawOnChartArea: false },
+                            ticks: { font: { size: 14, stepSize: 1 } } 
+                        },
+                        x: {
+                            title: { display: true, text: '時刻', font: { size: 18 } },
+                            ticks: {
+                                autoSkip: true,
+                                maxRotation: 0, 
+                                minRotation: 0,
+                                font: { size: 14 }, 
+                                callback: function(val, index) {
+                                    const fullTime = this.getLabelForValue(val);
+                                    // 秒・分単位では5分ごとにラベルを表示するロジックを再現
+                                    if (currentUnit === 'second' || currentUnit === 'minute') {
+                                        const parts = fullTime.split(':'); 
+                                        const minutes = parseInt(parts[1]);
+                                        if (minutes % 5 !== 0) return '';
+                                    }
+                                    return formatTimeLabel(fullTime, currentUnit);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error(`[CHART ERROR] Chart.js の描画中に致命的なエラーが発生しました:`, e); 
+        }
+
+        statusDiv.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP', {hour12: false})}`;
+    }
+
+    function aggregateData(data, unit) {
+        if (unit === 'second') {
             const labels = [];
             const attendance = [];
             const complaint = [];
             const complaintMap = {};
-
-            // 時刻順にソートして配列に格納
-            Object.keys(aggregated).sort().forEach(key => {
-                const item = aggregated[key];
-                labels.push(key);
-                attendance.push(item.lastAttendance);
-                complaint.push(item.complaintSum);
-
-                if (item.complaintDetails.length > 0) {
-                    // complaintMapのキーは集計単位の時刻 (HH:MM)
-                    complaintMap[key] = item.complaintDetails.map(record => {
-                        return `${record.time} ${record.detail}`;
-                    }).join('\n---\n');
+            
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                const timePart = row[0]; // HH:mm:ss
+                
+                labels.push(timePart);
+                attendance.push(row[1]);
+                complaint.push(row[2]);
+                
+                if (row[2] > 0 && row[3]) {
+                    // complaintMapにはHH:mm:ssと詳細を格納
+                    complaintMap[timePart] = `${timePart} ${row[3]}`; 
                 }
-            });
-
+            }
             return { labels, attendance, complaint, complaintMap };
-        };
+        }
 
+        const intervalMinutes = {
+            'minute': 1,
+            'ten-minutes': 10,
+            'thirty-minutes': 30,
+            'hour': 60
+        }[unit];
+        
+        const aggregated = {}; 
 
-        /**
-         * 生のログデータからタイムラインデータ（場内人数とトラブル）を計算
-         */
-        const calculateTimeline = (rawLogs, date) => {
-            const filteredLogs = rawLogs.filter(log => log.event_day === date);
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            const timestampString = row[0]; // HH:mm:ss
             
-            // timestamp (Firestore Timestamp) で昇順にソート
-            filteredLogs.sort((a, b) => a.timestamp.toDate().getTime() - b.timestamp.toDate().getTime());
-
-            let currentCount = 0; 
-            const timeline = [];
-
-            filteredLogs.forEach(log => {
-                const logTimestamp = log.timestamp.toDate();
-                const formattedTimestamp = `${logTimestamp.getFullYear()}/${String(logTimestamp.getMonth() + 1).padStart(2, '0')}/${String(logTimestamp.getDate()).padStart(2, '0')} ${String(logTimestamp.getHours()).padStart(2, '0')}:${String(logTimestamp.getMinutes()).padStart(2, '0')}:${String(logTimestamp.getSeconds()).padStart(2, '0')}`;
-                
-                let complaintCount = 0;
-                let complaintDetails = null;
-
-                if (log.type === 'in' || log.type === 'out') {
-                    const countValue = log.count || 1; 
-                    if (log.type === 'in') {
-                        currentCount += countValue;
-                    } else if (log.type === 'out') {
-                        currentCount = Math.max(0, currentCount - countValue); 
-                    }
-                } else {
-                    complaintCount = 1; 
-                    complaintDetails = `[${log.type}] ${log.content || log.vendor_name || '詳細不明'}`;
-                    if (log.place) {
-                        complaintDetails += ` (場所: ${log.place})`;
-                    }
-                }
-
-                timeline.push({
-                    timestamp: formattedTimestamp,
-                    currentCount: currentCount,
-                    complaintCount: complaintCount,
-                    complaintDetails: complaintDetails
-                });
-            });
-
-            return timeline;
-        };
-
-
-        // =========================================================================
-        // Chart.js 描画ロジック
-        // =========================================================================
-
-        /**
-         * Chart.jsを初期化し、グラフを描画/更新する
-         */
-        const drawChart = () => {
-            const chartCanvas = document.getElementById('chart_div');
-            if (!window.Chart || !chartCanvas || timelineData.length === 0) {
-                // ログがない場合やChart.jsがロードされていない場合のメッセージ表示
-                if (!isLoading) {
-                    const context = chartCanvas ? chartCanvas.getContext('2d') : null;
-                    if (context) {
-                        const message = !window.Chart 
-                            ? 'Chart.jsが読み込まれていません。'
-                            : `${selectedDate} の記録がありません。`;
-                        
-                        // キャンバスをクリア
-                        context.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-                        // サイズがまだ設定されていない場合があるため、親要素のサイズを取得して設定
-                        const container = chartCanvas.parentElement;
-                        chartCanvas.width = container.clientWidth;
-                        chartCanvas.height = container.clientHeight;
-
-                        context.font = "16px Inter, sans-serif";
-                        context.textAlign = "center";
-                        context.fillStyle = "#6b7280"; // gray-500
-                        context.fillText(message, chartCanvas.width / 2, chartCanvas.height / 2);
-                    }
-                }
-                return;
-            }
-
-            const { labels, attendance, complaint, complaintMap } = aggregateData(timelineData, aggregationUnit);
-            const ctx = chartCanvas.getContext('2d');
-
-            // 既存のチャートがあれば破棄
-            if (chartInstance) {
-                chartInstance.destroy();
+            // 日付情報がないため、今日のダミー日付を使ってDateオブジェクトを作成
+            const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
+            const timestamp = new Date(`${today} ${timestampString}`);
+            
+            if (isNaN(timestamp.getTime())) {
+                continue;
             }
             
-            // 最大人数と最大報告件数を計算
-            const maxAttendance = Math.max(10, ...attendance);
-            const maxComplaint = Math.max(1, ...complaint);
-
-            try {
-                chartInstance = new window.Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: '場内人数',
-                                data: attendance,
-                                yAxisID: 'y1',
-                                borderColor: 'rgba(52, 211, 153, 1)', 
-                                backgroundColor: 'rgba(52, 211, 153, 0.4)',
-                                tension: 0.2,
-                                fill: false,
-                                pointRadius: (aggregationUnit === 'second' || aggregationUnit === 'minute') ? 3 : 0
-                            },
-                            {
-                                label: 'トラブル等記録件数',
-                                data: complaint,
-                                yAxisID: 'y2',
-                                borderColor: 'rgba(239, 68, 68, 1)', 
-                                backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                                type: 'bar',
-                                order: 1,
-                                pointRadius: 0,
-                                barPercentage: 0.8
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: { duration: 500 },
-                        onClick: (e) => {
-                            const chart = chartInstance;
-                            if (!chart) return;
-
-                            const activePoints = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
-                            if (activePoints.length > 0) {
-                                const firstPoint = activePoints[0];
-                                const label = labels[firstPoint.index]; 
-
-                                if (complaintMap[label]) {
-                                    showModal({
-                                        title: `【トラブル等記録内容 - ${label}】`,
-                                        details: complaintMap[label]
-                                    });
-                                }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: `${selectedDate} の場内/トラブル等記録推移 (${getUnitLabel(aggregationUnit)}単位)`,
-                                font: { size: 18, family: 'Inter, sans-serif' }
-                            },
-                            legend: {
-                                position: 'bottom',
-                                labels: { font: { size: 14, family: 'Inter, sans-serif' } }
-                            },
-                            tooltip: {
-                                bodyFont: { size: 14, family: 'Inter, sans-serif' },
-                                titleFont: { size: 14, family: 'Inter, sans-serif' }
-                            }
-                        },
-                        scales: {
-                            y1: {
-                                type: 'linear', position: 'left',
-                                title: { display: true, text: '場内人数', font: { size: 18, family: 'Inter, sans-serif' } },
-                                beginAtZero: true,
-                                max: maxAttendance * 1.1, 
-                                ticks: { font: { size: 14, family: 'Inter, sans-serif' } }
-                            },
-                            y2: {
-                                type: 'linear', position: 'right',
-                                title: { display: true, text: 'トラブル等件数 (集計)', font: { size: 18, family: 'Inter, sans-serif' } },
-                                min: 0,
-                                max: maxComplaint * 1.2, 
-                                grid: { drawOnChartArea: false },
-                                ticks: { stepSize: 1, font: { size: 14, family: 'Inter, sans-serif' } }
-                            },
-                            x: {
-                                title: { display: true, text: '時刻', font: { size: 18, family: 'Inter, sans-serif' } },
-                                ticks: {
-                                    autoSkip: true,
-                                    maxRotation: 0,
-                                    minRotation: 0,
-                                    font: { size: 14, family: 'Inter, sans-serif' },
-                                    callback: function(val) {
-                                        // Chart.jsのtick callbackは、描画時に改行文字をサポートします
-                                        const fullTime = labels[val]; 
-                                        return formatTimeLabel(fullTime, aggregationUnit);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            } catch (e) {
-                console.error("[CHART ERROR] Chart.js failed to draw:", e);
-                setError("グラフ描画中にエラーが発生しました。");
-                renderApp(); // エラーメッセージを表示するためにUIを再レンダリング
-            }
-        };
-
-        // =========================================================================
-        // モーダル処理
-        // =========================================================================
-
-        window.showModal = (content) => {
-            modalContent = content;
-            const container = document.getElementById('modalContainer');
-            const titleEl = document.getElementById('modalTitle');
-            const detailsEl = document.getElementById('modalDetails');
-
-            titleEl.textContent = content.title;
-            detailsEl.textContent = content.details;
+            const attendanceCount = row[1];
+            const complaintCount = row[2];
+            const complaintDetails = row[3];
             
-            // アニメーション用のクラス設定
-            container.classList.remove('hidden', 'opacity-0');
-            container.classList.add('flex', 'opacity-100');
-            document.getElementById('modalContent').classList.remove('scale-95');
-            document.getElementById('modalContent').classList.add('scale-100');
-
-            document.body.classList.add('modal-open');
-        };
-
-        window.closeModal = () => {
-            modalContent = null;
-            const container = document.getElementById('modalContainer');
+            let hour = timestamp.getHours();
+            let minute = timestamp.getMinutes();
             
-            // アニメーション用のクラス設定
-            document.getElementById('modalContent').classList.remove('scale-100');
-            document.getElementById('modalContent').classList.add('scale-95');
+            // 単位に基づいた分への切り捨て
+            minute = Math.floor(minute / intervalMinutes) * intervalMinutes;
 
-            setTimeout(() => {
-                container.classList.remove('flex', 'opacity-100');
-                container.classList.add('hidden', 'opacity-0');
-                document.body.classList.remove('modal-open');
-            }, 300); // 300msのアニメーション後に非表示
-        };
-
-
-        // =========================================================================
-        // DOMイベントハンドラ (状態変更と再描画トリガー)
-        // =========================================================================
-
-        window.handleDateChange = (event) => {
-            const newDate = event.target.value;
-            if (newDate !== selectedDate) {
-                selectedDate = newDate;
-                recalculateAndRender();
-            }
-        };
-
-        window.handleUnitChange = (unit) => {
-            if (unit !== aggregationUnit) {
-                aggregationUnit = unit;
-                drawChart(); // 単位が変わった場合はチャートのみ再描画
-                renderUnitButtons(); // ボタンの状態を更新
-            }
-        };
-
-        // =========================================================================
-        // UIレンダリング関数
-        // =========================================================================
-
-        /**
-         * アプリケーションのメインUIをレンダリングする
-         */
-        const renderApp = () => {
-            const appDiv = document.getElementById('app');
-            let contentHTML = '';
-
-            if (isLoading) {
-                contentHTML = `
-                    <div class="flex items-center justify-center min-h-screen bg-gray-50">
-                        <div class="text-center p-8 bg-white rounded-xl shadow-lg">
-                            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p class="text-gray-700 font-semibold">データを準備中... (ログをロードして集計しています)</p>
-                        </div>
-                    </div>
-                `;
-            } else if (error) {
-                contentHTML = `
-                    <div class="flex items-center justify-center min-h-screen bg-red-50">
-                        <div class="p-8 bg-white rounded-xl shadow-lg border border-red-400">
-                            <h2 class="text-xl font-bold text-red-600 mb-2">エラーが発生しました</h2>
-                            <p class="text-gray-700">${error}</p>
-                        </div>
-                    </div>
-                `;
+            const minuteStr = String(minute).padStart(2, '0');
+            const hourStr = String(hour).padStart(2, '0');
+            const key = `${hourStr}:${minuteStr}`; // 集計キー HH:mm
+            
+            if (!aggregated[key]) {
+                aggregated[key] = {
+                    lastAttendance: attendanceCount, 
+                    complaintSum: 0,
+                    complaintDetails: [] 
+                };
             } else {
-                // メインコンテンツ
-                contentHTML = `
-                    <header class="text-center mb-6">
-                        <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-600 tracking-tight">場内人数・イベントログ推移リアルタイムビュー</h1>
-                        <p class="text-sm text-gray-500 mt-1">最終更新: ${new Date().toLocaleTimeString('ja-JP', { hour12: false })}</p>
-                    </header>
-
-                    <div class="bg-white rounded-xl shadow-xl p-4 sm:p-6 mb-6 h-[70vh] min-h-[400px]">
-                        <h2 class="text-lg font-semibold text-gray-800 mb-4">場内人数とトラブル記録の推移</h2>
-                        <div id="chartContainer" class="w-full relative">
-                            <canvas id="chart_div"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="max-w-4xl mx-auto">
-                        <!-- 日付選択コントロール -->
-                        <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
-                            <label for="dateSelector" class="block text-lg font-bold text-gray-700 mb-3">表示するイベント日を選択 (event_day):</label>
-                            <select
-                                id="dateSelector"
-                                onchange="handleDateChange(event)"
-                                class="w-full p-3 text-lg border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm"
-                            >
-                                <!-- オプションはrenderDateSelectorで動的に追加されます -->
-                            </select>
-                        </div>
-
-                        <!-- 単位選択コントロール -->
-                        <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
-                            <label class="block text-lg font-bold text-gray-700 mb-3">表示単位:</label>
-                            <div id="unitButtonsContainer" class="flex flex-wrap justify-between gap-2 overflow-x-auto p-1">
-                                <!-- ボタンはrenderUnitButtonsで動的に追加されます -->
-                            </div>
-                        </div>
-
-                        <!-- ユーザーID表示（デバッグ・連携用） -->
-                        <div class="text-sm text-gray-500 text-center p-3 rounded-lg bg-white shadow-sm mb-6">
-                            <p>
-                                **現在のユーザーID**: <span class="font-mono text-xs break-all">${userId || '認証中...'}</span>
-                            </p>
-                        </div>
-
-                        <!-- メニューへ戻るボタン (デモ) -->
-                        <div class="text-center">
-                            <button
-                                onclick="console.log('メニューへ戻るボタンがクリックされました')"
-                                class="w-full max-w-lg py-3 bg-gray-500 text-white font-semibold text-lg rounded-xl shadow-lg hover:bg-gray-600 transition duration-200"
-                            >
-                                メニューへ戻る (デモ)
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-            appDiv.innerHTML = contentHTML;
-
-            if (!isLoading && !error) {
-                // コントロールとチャートのレンダリングを呼び出す
-                renderDateSelector();
-                renderUnitButtons();
-                // グラフはDOMが完全にロードされた後、またはデータ更新時に描画
-                // 初期ロード時に1回実行
-                if (window.Chart) {
-                    drawChart();
-                }
-            }
-        };
-
-        /**
-         * 日付選択ドロップダウンをレンダリングする
-         */
-        const renderDateSelector = () => {
-            const selector = document.getElementById('dateSelector');
-            if (!selector) return;
-
-            // オプションをクリア
-            selector.innerHTML = ''; 
-
-            if (datesList.length > 0) {
-                datesList.forEach(date => {
-                    const option = document.createElement('option');
-                    option.value = date;
-                    option.textContent = date;
-                    if (date === selectedDate) {
-                        option.selected = true;
-                    }
-                    selector.appendChild(option);
-                });
-            } else {
-                const option = document.createElement('option');
-                option.value = selectedDate;
-                option.textContent = `${selectedDate} (ログなし)`;
-                selector.appendChild(option);
-            }
-        };
-
-        /**
-         * 単位選択ボタンをレンダリングする
-         */
-        const renderUnitButtons = () => {
-            const container = document.getElementById('unitButtonsContainer');
-            if (!container) return;
-
-            container.innerHTML = ''; 
-
-            const units = ['second', 'minute', 'ten-minutes', 'thirty-minutes', 'hour'];
-            units.forEach(unit => {
-                const isActive = aggregationUnit === unit;
-                const button = document.createElement('button');
-                button.textContent = getUnitLabel(unit);
-                button.onclick = () => window.handleUnitChange(unit);
-                button.className = `
-                    flex-shrink-0 min-w-[18%] p-3 text-sm sm:text-base font-semibold rounded-lg transition duration-200 shadow-md 
-                    ${isActive 
-                        ? 'bg-blue-600 text-white shadow-blue-400/50 hover:bg-blue-700' 
-                        : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
-                    }
-                `;
-                container.appendChild(button);
-            });
-        };
-
-        /**
-         * タイムラインデータを再計算し、チャートを再描画する
-         */
-        const recalculateAndRender = () => {
-            if (rawLogData.length > 0 && selectedDate) {
-                timelineData = calculateTimeline(rawLogData, selectedDate);
-                console.log(`[Recalculate] Timeline for ${selectedDate} updated. Entries: ${timelineData.length}`);
-            } else if (selectedDate) {
-                timelineData = [];
-                console.log(`[Recalculate] No raw data found for ${selectedDate}.`);
-            }
-            renderApp(); // UI全体を更新（主にタイトルとメッセージ）
-            drawChart(); // チャートを再描画
-        };
-
-
-        // =========================================================================
-        // Firebase初期化とデータリスナー
-        // =========================================================================
-
-        /**
-         * Firebaseを初期化し、認証を行う
-         */
-        const initializeFirebase = async () => {
-            if (Object.keys(firebaseConfig).length === 0) {
-                console.warn("Firebase config is missing. Using mock user.");
-                userId = 'mock_user';
-                isLoading = false;
-                renderApp();
-                return;
+                // 最後のログの場内人数を採用
+                aggregated[key].lastAttendance = attendanceCount; 
             }
 
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                userId = auth.currentUser ? auth.currentUser.uid : crypto.randomUUID();
-                setupFirestoreListener();
-            } catch (e) {
-                console.error("Firebase initialization or auth failed:", e);
-                error = "Firebaseの初期化または認証に失敗しました。";
-                isLoading = false;
-                renderApp();
-            }
-        };
-
-        /**
-         * Firestoreのログデータリスナーを設定する
-         */
-        const setupFirestoreListener = () => {
-            if (!db) return;
-
-            // 既存のリスナーがあれば解除
-            if (logUnsubscribe) {
-                logUnsubscribe();
-            }
+            aggregated[key].complaintSum += complaintCount;
             
-            // /artifacts/{appId}/public/data/log を購読
-            const logCollectionRef = collection(db, `artifacts/${appId}/public/data/log`);
-            const logQuery = logCollectionRef; 
-            console.log(`[Firestore] Subscribing to: log collection.`);
-
-            logUnsubscribe = onSnapshot(logQuery, (snapshot) => {
-                const logs = [];
-                const uniqueDays = new Set();
-                let latestDate = null;
-                let foundSelectedDate = false;
-
-                snapshot.forEach(doc => {
-                    const log = doc.data();
-                    if (log.timestamp && log.event_day) {
-                        logs.push(log);
-                        uniqueDays.add(log.event_day);
-
-                        if (log.event_day === selectedDate) {
-                            foundSelectedDate = true;
-                        }
-
-                        // 最新日付を特定
-                        try {
-                            const logDate = log.timestamp.toDate().getTime();
-                            if (latestDate === null || logDate > latestDate.time) {
-                                latestDate = { day: log.event_day, time: logDate };
-                            }
-                        } catch(e) {
-                            console.warn("Timestamp conversion error for log:", log, e);
-                        }
-                    }
+            if (complaintDetails) {
+                // 時刻情報 (HH:mm:ss) と内容をセットにしたオブジェクトを配列にプッシュ
+                aggregated[key].complaintDetails.push({
+                    time: timestampString, // HH:mm:ss
+                    detail: complaintDetails
                 });
-                
-                rawLogData = logs;
-                
-                // 日付リストを降順にソートして設定
-                datesList = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a));
+            }
+        }
 
-                // ログが全くない場合、または初期表示日が存在しない場合は最新の日付に設定
-                if (datesList.length > 0) {
-                    if (!foundSelectedDate && latestDate) {
-                        selectedDate = latestDate.day;
-                    } else if (!selectedDate || !datesList.includes(selectedDate)) {
-                        selectedDate = datesList[0];
-                    }
-                }
+        const labels = [];
+        const attendance = [];
+        const complaint = [];
+        const complaintMap = {};
 
-                // ローディングを終了
-                isLoading = false;
-
-                // データが更新されたので再計算とレンダリング
-                recalculateAndRender();
-
-                console.log(`[Firestore] Log data received. Total entries: ${logs.length}, Unique days: ${datesList.length}`);
-            }, (err) => {
-                console.error("Firestore listen error (log):", err);
-                error = "ログデータの読み込み中にエラーが発生しました。";
-                isLoading = false;
-                renderApp();
-            });
-        };
-
-        // =========================================================================
-        // アプリケーションのエントリポイント
-        // =========================================================================
-
-        window.onload = () => {
-            // 初期ローディング表示
-            renderApp(); 
-            initializeFirebase();
-
-            // 60秒ごとの自動更新を設定
-            setInterval(() => {
-                // 最後の更新時刻を更新
-                const header = document.querySelector('header p');
-                if (header) {
-                    header.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP', { hour12: false })}`;
-                }
-                drawChart();
-            }, 60000);
-        };
-
-        // ウィンドウのリサイズ時にチャートを再描画してレスポンシブに対応
-        window.addEventListener('resize', () => {
-            if (chartInstance) {
-                // Chart.jsはresponsive: trueなので、再描画は不要ですが、
-                // データの再集計や特別な処理が必要な場合は drawChart() を呼び出します。
-                // ここでは不要なため、何もしません。
+        // 集計キーでソートして最終データを作成
+        Object.keys(aggregated).sort().forEach(key => {
+            const item = aggregated[key];
+            labels.push(key);
+            attendance.push(item.lastAttendance);
+            complaint.push(item.complaintSum);
+            
+            if (item.complaintDetails.length > 0) {
+                // 集計単位の時刻 (HH:mm) に紐づく全てのトラブル詳細を結合
+                complaintMap[key] = item.complaintDetails.map(record => {
+                    return `(${record.time}) ${record.detail}`; 
+                }).join('\n----------\n'); 
             }
         });
+        
+        return { labels, attendance, complaint, complaintMap };
+    }
 
-    </script>
+    function getUnitLabel(unit) {
+        return {
+            'second': '1秒',
+            'minute': '1分',
+            'ten-minutes': '10分',
+            'thirty-minutes': '30分',
+            'hour': '1時間'
+        }[unit];
+    }
+
+    function formatTimeLabel(timeString, unit) {
+        // timeStringは 'HH:mm:ss' または 'HH:mm' の形式を想定
+        const parts = timeString.split(':');
+
+        const h = parts[0]; // 時
+        const m = parts[1]; // 分
+        const s = parts[2]; // 秒 
+
+        if (unit === 'second') {
+            // 1秒単位: 時\n分\n秒
+            return [h, m, s];
+        } else if (unit === 'minute') {
+            // 1分単位: 時\n分
+            return [h, m];
+        } else {
+            // 10分、30分、1時間単位: 時のみ、または時:分
+            return (parts.length > 1 && m !== '00') ? [h, m] : [h];
+        }
+    }
+    
+    function onFailure(error) {
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+        statusDiv.textContent = `エラー: データの取得に失敗しました。`;
+        console.error(`[FATAL ERROR] データ取得またはFirebase処理失敗:`, error);
+        if (myChart) myChart.destroy();
+        const container = document.getElementById('chart-container');
+        container.innerHTML = `<canvas id="chart_div" class="loading"><p class="text-xl font-medium text-red-500">グラフの読み込みに失敗しました。</p><p class="text-sm text-gray-500 mt-2">${error.message || '不明なエラー'}</p></canvas>`;
+    }
+</script>
 </body>
 </html>
