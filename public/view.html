@@ -3,8 +3,6 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 
-// Chart.jsをCDN経由でロードするためのスクリプト
-// Canvas環境では<script>タグが実行され、window.Chartにアクセスできるようになります。
 const CHART_CDN_SCRIPT = (
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 );
@@ -671,5 +669,3 @@ const App = () => {
     </div>
   );
 };
-
-export default App;
