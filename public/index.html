@@ -144,20 +144,18 @@
         // ----------------------------------------------------
         // 1. Firebase設定とグローバル変数
         // ----------------------------------------------------
-        // ユーザー提供の設定をフォールバックとして使用し、環境変数が優先されるようにする
+        
         let firebaseConfig = null;
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
             try {
-                // 環境変数が存在するならそれを優先
                 firebaseConfig = JSON.parse(__firebase_config);
             } catch (e) {
                 console.error("Failed to parse __firebase_config:", e);
             }
         }
 
-        // 環境変数が利用できない場合、ユーザーから提供された設定を使用 (エラー解消のため)
         if (!firebaseConfig) {
-            console.warn("環境変数__firebase_configが見つかりません。ハードコードされた設定を使用します。");
+            console.warn("環境変数__firebase_configが見つかりません。フォールバック設定を使用します。");
             firebaseConfig = {
                 apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
                 authDomain: "setapanmarketcounter.firebaseapp.com",
@@ -176,15 +174,18 @@
         let db, auth;
         let userId = null;
         let daySettings = { day1: null, day2: null }; 
+        // ログデータを保持する変数 (リアルタイム処理のために必要)
+        let logData = []; 
+        let calculationInterval = null; // リアルタイム計算用インターバル
 
-        // UI要素 (省略)
+        // UI要素
         const currentCountValueEl = document.getElementById('current-count-value');
         const waitTimeValueEl = document.getElementById('wait-time-value');
         const day1VisitorsEl = document.getElementById('day1-visitors');
         const day2VisitorsEl = document.getElementById('day2-visitors');
+        const totalVisitorsEl = document.getElementById('total-visitors');
         const eventDay1DateEl = document.getElementById('event-day1-date');
         const eventDay2DateEl = document.getElementById('event-day2-date');
-        const currentDateEl = document.getElementById('current-date-time');
         
         // データベースパス定義ヘルパー
         const getPublicCollectionPath = (collectionName) => 
@@ -199,31 +200,82 @@
 
         // 日付フォーマットヘルパー (MM/DD形式)
         const formatDate = (timestamp) => {
-            if (!timestamp) return '未設定';
+            if (!timestamp) return '--/--';
             const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
             return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
         };
 
-        // リアルタイム現在日時を更新する関数 (秒単位まで表示)
-        function updateCurrentDateTime() {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('ja-JP', { 
-                month: '2-digit', 
-                day: '2-digit', 
-                timeZone: 'Asia/Tokyo' 
-            });
-            const timeStr = now.toLocaleTimeString('ja-JP', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit', 
-                hour12: false, 
-                timeZone: 'Asia/Tokyo' 
-            });
-            currentDateEl.textContent = `現在日時: ${dateStr} ${timeStr}`;
-        }
-        
         // ----------------------------------------------------
-        // 2. リアルタイムデータリスナー
+        // 2. リアルタイム時間が関係する計算関数 (New)
+        // ----------------------------------------------------
+        /**
+         * ログデータとリアルタイム時間 (new Date()) を基に、場内人数と待ち時間を更新します。
+         * onSnapshotでデータが更新された時、およびsetIntervalで時間が経過した時に呼び出されます。
+         */
+        function updateCalculations() {
+            // リアルタイムの現在日時を直接取得
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+            
+            let currentCount = 0;
+            let day1TotalIn = 0;
+            let day2TotalIn = 0;
+
+            // 🔹過去◯分（可変）を設定
+            const lookbackMinutes = 30; // 30分間のローリングウィンドウ
+            const lookbackMs = lookbackMinutes * 60 * 1000;
+            const sinceTime = new Date(now.getTime() - lookbackMs);
+
+            let recentInCount = 0; // 過去30分間の入場数
+
+            logData.forEach(data => {
+                const type = data.type; // "in" or "out"
+                const eventDay = data.event_day;
+                const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
+                const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+                if (!ts) return;
+
+                const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+                // 当日以外は無視 (Day1/Day2は静的日付設定に依存するため、ここではTodayでフィルタ)
+                if (tsDateStr !== todayStr) return; 
+
+                // 当日データを集計
+                if (type === 'in') {
+                    currentCount += count;
+                    if (eventDay === 'day1') day1TotalIn += count;
+                    else if (eventDay === 'day2') day2TotalIn += count;
+
+                    // 🔹30分以内のデータをカウント (リアルタイム時間 'now' に依存)
+                    if (ts >= sinceTime) recentInCount += count;
+                } else if (type === 'out') {
+                    currentCount -= count;
+                }
+            });
+
+            // 🔹現在場内人数
+            currentCount = Math.max(0, currentCount);
+            currentCountValueEl.textContent = currentCount.toLocaleString();
+
+            // 🔹各日合計 (onSnapshotで更新されるが、リアルタイム性が低いためここでも更新して統一性を保つ)
+            day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
+            day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
+            totalVisitorsEl.textContent = (day1TotalIn + day2TotalIn).toLocaleString();
+
+            // 🔹100人あたり待ち時間を算出
+            let waitTimeText = '--';
+            if (recentInCount > 0) {
+                // 100人あたりの待ち時間 (分) = (30分 / 過去30分の入場者数) * 100
+                const timePer100 = (lookbackMinutes / recentInCount) * 100;
+                waitTimeText = timePer100.toFixed(1); // 小数1桁
+            }
+            waitTimeValueEl.textContent = waitTimeText;
+
+            // デバッグログ: 計算に使われたリアルタイム時間
+            // console.log(`[Calc] Current Time: ${now.toLocaleTimeString('ja-JP')}, Recent In: ${recentInCount}, Wait Time: ${waitTimeText}分`);
+        }
+
+        // ----------------------------------------------------
+        // 3. リアルタイムデータリスナー
         // ----------------------------------------------------
         function setupRealtimeListener() {
             if (!db) {
@@ -245,80 +297,34 @@
                 console.error("日付設定の購読エラー:", error);
             });
 
- // --- B. ログデータの監視と集計 (logコレクション) ---
-// --- B. ログデータの監視と集計 (logコレクション) ---
-onSnapshot(getLogCollectionRef(db), (snapshot) => {
-    let currentCount = 0;
-    let day1TotalIn = 0;
-    let day2TotalIn = 0;
-
-    const now = new Date();
-    const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-
-    // 🔹過去◯分（可変）を設定
-    const lookbackMinutes = 30; // ←ここを変えれば可変
-    const lookbackMs = lookbackMinutes * 60 * 1000;
-    const sinceTime = new Date(now.getTime() - lookbackMs);
-
-    let recentInCount = 0; // 過去30分間の入場数
-
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        const type = data.type; // "in" or "out"
-        const eventDay = data.event_day;
-        const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
-        const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
-        if (!ts) return;
-
-        const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-        if (tsDateStr !== todayStr) return; // 当日以外は無視
-
-        // 当日データを集計
-        if (type === 'in') {
-            currentCount += count;
-            if (eventDay === 'day1') day1TotalIn += count;
-            else if (eventDay === 'day2') day2TotalIn += count;
-
-            // 🔹30分以内のデータをカウント
-            if (ts >= sinceTime) recentInCount += count;
-        } else if (type === 'out') {
-            currentCount -= count;
-        }
-    });
-
-    // 🔹現在場内人数
-    currentCount = Math.max(0, currentCount);
-    currentCountValueEl.textContent = currentCount.toLocaleString();
-
-    // 🔹各日合計
-    day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
-    day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
-
-    // 🔹100人あたり待ち時間を算出
-    let waitTimeText = '--';
-    if (recentInCount > 0) {
-        const timePer100 = 3000 / recentInCount; // 分単位
-        waitTimeText = timePer100.toFixed(1); // 小数1桁
-    }
-    waitTimeValueEl.textContent = waitTimeText;
-
-}, (error) => {
-    console.error(`ログデータ監視エラー: ${error.message}`);
-    currentCountValueEl.textContent = 'データエラー';
-    waitTimeValueEl.textContent = '--';
-});
+            // --- B. ログデータの監視と集計 (logコレクション) ---
+            onSnapshot(getLogCollectionRef(db), (snapshot) => {
+                // ログデータをキャッシュする
+                logData = snapshot.docs.map(doc => doc.data());
+                
+                // データが変更されたら即座に計算を実行
+                updateCalculations(); 
+                
+            }, (error) => {
+                console.error(`ログデータ監視エラー: ${error.message}`);
+                currentCountValueEl.textContent = 'データエラー';
+                waitTimeValueEl.textContent = '--';
+            });
+            
+            // --- C. リアルタイム時間による計算の更新 (New) ---
+            // ログデータ自体に変化がなくても、30分間のローリングウィンドウを動かすために5秒ごとに再計算
+            if (calculationInterval) clearInterval(calculationInterval);
+            calculationInterval = setInterval(updateCalculations, 5000); 
+            console.log("リアルタイム計算インターバルを開始しました (5秒ごと)。");
         }
 
         // ----------------------------------------------------
-        // 3. 初期化処理
+        // 4. 初期化処理
         // ----------------------------------------------------
         async function initializeAppAndAuth() {
-            // リアルタイム現在日時表示を開始
-            updateCurrentDateTime();
-            setInterval(updateCurrentDateTime, 1000);
-
+            // 現在日時の表示・更新ロジックは削除されました
+            
             if (!firebaseConfig) {
-                // ハードコード設定も失敗した場合の最終フォールバック
                 currentCountValueEl.textContent = '致命的エラー';
                 console.error("致命的エラー: Firebase設定がロードできませんでした。");
                 return;
@@ -359,15 +365,3 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
