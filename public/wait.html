@@ -73,6 +73,9 @@
         .back-button:hover {
             background-color: #4b5563;
         }
+        .map-container {
+            margin-top: 2rem;
+        }
         #event-map {
             width: 100%;
             height: auto;
@@ -90,8 +93,8 @@
         <div class="pace-info">
             <div id="loading-status" class="text-sm text-blue-600 font-semibold">
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 最新データを取得中...
             </div>
@@ -110,7 +113,7 @@
         </div>
 
         <div class="map-container">
-            <!-- 💡 GASのDriveAppは使用できないため、プレースホルダー画像に置き換え -->
+            <!-- プレースホルダー画像URLを使用 -->
             <img id="event-map" 
                  src='map.jpg' 
                  alt="イベント会場マップ">
@@ -130,10 +133,12 @@
         // onSnapshot, setLogLevel をインポート
         import { getFirestore, collection, query, where, Timestamp, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 定数（GASから移植） ---
-        const PACE_WINDOW_MINUTES = 30; // 過去指定分間のペースで計算
+        // --- 定数 ---
+        // ユーザーの index.html ロジックに合わせ、ペース算出は固定30分間のログのみを対象とする
+        const PACE_WINDOW_MINUTES = 30; 
+        const MIN_PEOPLE_FOR_PACE = 3;  // ペース計算に必要な最小人数
         const DEFAULT_WAIT_TIME = 0;    // データ不足時のデフォルト待ち時間 (分)
-        const PEOPLE_PER_METER = 2.5;   // 行列の密度: 1メートルあたり2.5人 (GASと同じ値)
+        const PEOPLE_PER_METER = 2.5;   // 行列の密度: 1メートルあたり2.5人
         
         // --- Firebase 環境設定（ユーザー提供のロジックを反映） ---
         let firebaseConfig = null;
@@ -224,53 +229,41 @@
         }
         
         /**
-         * ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
-         * @param {Array<Object>} data - ログデータの配列
+         * 【修正】ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
+         * ユーザーのindex.htmlのロジック (固定30分間の平均ペース) を採用
+         * @param {Array<Object>} data - 過去30分間のログデータの配列 (onSnapshotでフィルタリング済み)
          */
         function calculatePaceFromLogData(data) {
-            const now = new Date().getTime();
-            const windowStart = now - (PACE_WINDOW_MINUTES * 60 * 1000); 
-
-            let totalEntries = 0;
-            let firstEntryTimeMs = null; 
-
-            // ログを下から（新しいものから）遡って処理するため、時刻でソート
-            // Timestampオブジェクトの比較はtoMillis()で行う
-            const sortedData = [...data].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-
-            for (const log of sortedData) {
-                // 【修正】クライアント側で type のフィルタリングを行う
-                if (log.type !== '入場' || typeof log.count !== 'number' || log.count <= 0) {
-                    continue; // 入場タイプではない、またはカウントが0以下の場合はスキップ
-                }
-
-                const timestampMs = log.timestamp.toMillis();
-
-                if (timestampMs < windowStart) {
-                    break; // 窓口時間外のデータになったら終了
-                }
-                
-                totalEntries += log.count;
-                firstEntryTimeMs = timestampMs; // ループの最後（最も古い）の有効な入場時刻が残る
-            }
-
-            if (totalEntries < 3 || firstEntryTimeMs === null) { 
-                return { entryRate: 0, waitTimePer100: DEFAULT_WAIT_TIME }; 
-            }
-
-            // 処理時間 (分): 現在時刻 - 最も古い有効な入場時刻
-            const timeSpanMinutes = (now - firstEntryTimeMs) / (60 * 1000); 
-
-            if (timeSpanMinutes < 1) {
-                return { entryRate: 0, waitTimePer100: DEFAULT_WAIT_TIME };
-            }
+            let recentInCount = 0;
             
-            const entryRatePerMinute = totalEntries / timeSpanMinutes;
-            const waitTimePer100 = 100 / entryRatePerMinute;
+            // 過去30分間の入場数を合計する
+            for (const log of data) {
+                // typeが「入場」であり、countが有効な数値であるログのみをカウント
+                if (log.type === '入場' && typeof log.count === 'number' && log.count > 0) {
+                    recentInCount += log.count;
+                }
+            }
+
+            // 最小人数 (3人) に満たない場合は、データ不足としてペースをゼロとする
+            if (recentInCount < MIN_PEOPLE_FOR_PACE) { 
+                return { 
+                    entryRate: 0, 
+                    waitTimePer100: DEFAULT_WAIT_TIME 
+                }; 
+            }
+
+            // 1. 1分あたりの入場ペース (人/分) を計算 (固定30分間で割る)
+            // (ユーザーのindex.htmlロジックに合わせるため、実際の時間幅ではなく固定の30分を使用)
+            const entryRatePerMinute = recentInCount / PACE_WINDOW_MINUTES;
+
+            // 2. 100人あたり待ち時間 (分) を計算
+            // 100 / (人/分) = 100 / (recentInCount / 30) = (100 * 30) / recentInCount = 3000 / recentInCount
+            const waitTimePer100 = (100 * PACE_WINDOW_MINUTES) / recentInCount;
             
             return {
                 entryRate: entryRatePerMinute,
-                waitTimePer100: Math.round(waitTimePer100)
+                // 小数点以下を四捨五入して表示するため、計算結果も四捨五入
+                waitTimePer100: Math.round(waitTimePer100) 
             };
         }
 
@@ -286,10 +279,10 @@
             // 過去30分間のデータのみを取得するためのクエリ
             const windowStartTimestamp = Timestamp.fromDate(new Date(Date.now() - (PACE_WINDOW_MINUTES * 60 * 1000)));
 
+            // 公開コレクションへのパス
             const logsRef = collection(db, `artifacts/${appId}/public/data/logs`);
             
             // 複合インデックスエラーを避けるため、timestamp のフィルタのみを使用
-            // 取得データは過去30分間に限定され、古いデータは取得しないためパフォーマンスが良い
             const q = query(
                 logsRef,
                 where('timestamp', '>=', windowStartTimestamp)
@@ -299,7 +292,11 @@
             onSnapshot(q, (snapshot) => {
                 logData = [];
                 snapshot.forEach(doc => {
-                    logData.push(doc.data());
+                    // toDate()がundefinedになる可能性があるため、チェックを追加
+                    const data = doc.data();
+                    if (data.timestamp && data.timestamp.toDate) {
+                         logData.push(data);
+                    }
                 });
                 
                 // データが更新されたら即座に計算を実行し、UIを更新
@@ -331,6 +328,7 @@
             currentEntryRate = entryRate;
 
             // UIを更新
+            // ペースが0.01人/分未満の場合は '0.00' と表示
             entryRateElement.innerText = currentEntryRate > 0.01 ? currentEntryRate.toFixed(2) : '0.00';
             waitTime100Element.innerText = waitTimePer100;
 
@@ -354,6 +352,7 @@
                 return;
             }
 
+            // ペースが0（計算不能状態）の場合の表示を維持
             if (currentEntryRate <= 0) {
                 estimatedWaitTimeElement.innerText = '計算不能';
                 return;
@@ -382,7 +381,8 @@
                 loadingStatusDiv.textContent = '🚨 Firebase接続エラー';
                 estimatedWaitTimeElement.innerText = 'エラー';
             }
-            // 入力値変更時も計算を再実行
+            // 初期計算を実行し、入力値変更時も計算を再実行
+            window.calculateWaitTime();
             queueLengthInput.addEventListener('input', window.calculateWaitTime);
         };
     </script>
