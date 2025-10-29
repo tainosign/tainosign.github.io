@@ -76,7 +76,15 @@ import {
 
         //const getLogCollectionRef = (dbInstance) => 
            // collection(dbInstance, LOG_COLLECTION_PATH('log')); // log コレクションを参照
-        
+                const getPublicCollectionPath = (collectionName) => 
+            // パス形式: /artifacts/setapanmarketcounter/public/data/{collectionName}
+            `/artifacts/${appId}/public/data/${collectionName}`;
+
+        const getDayDocRef = (dbInstance) => 
+            doc(dbInstance, getPublicCollectionPath('static'), 'day'); // static/day ドキュメントを参照
+
+        const getLogCollectionRef = (dbInstance) => 
+            collection(dbInstance, getPublicCollectionPath('log')); // log コレクションを参照
         let isAuthReady = false;
 
         // Firestoreのコレクションパス (Public Dataとして格納することを想定)
