@@ -280,7 +280,7 @@
             }
             
             // 公開コレクションへのパス (logsコレクションを参照)
-            const logsRef = collection(db, `artifacts/${appId}/public/data/logs`);
+            const logsRef = collection(db, `artifacts/${appId}/public/data/log`);
             
             // **修正**: where句を削除し、全てのログを監視する。
             // フィルタリングはJavaScript側で行うことでローリングウィンドウを実現する。
