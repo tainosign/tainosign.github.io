@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>退場カウンター</title>
+<style>
+  body {
+    font-family: "Noto Sans JP", sans-serif;
+    background-color: #f2f2f2;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+  }
+
+  .header-container {
+    background-color: #0097a7;
+    color: white;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .qr-container img {
+    width: 90px;
+    height: 90px;
+  }
+
+  .info-container {
+    flex: 1;
+    text-align: right;
+    font-size: 14px;
+  }
+
+  .counter {
+    margin: 10px auto;
+    width: 90%;
+  }
+
+  button {
+    width: 100%;
+    padding: 20px;
+    font-size: 2rem;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    margin: 5px 0;
+  }
+
+  .minus1 { background-color: #e53935; }
+  .minus5, .minus10 { background-color: #616161; width: 49%; font-size: 1.5rem; }
+  .plus1 { background-color: #fb8c00; }
+  .menu { background-color: #757575; font-size: 1.2rem; }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 2%;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-container">
+  <div class="qr-container">
+    <img src="YOUR_QR_IMAGE_URL" alt="QRコード">
+  </div>
+  <div class="info-container">
+    <div id="today-date">2025-10-29</div>
+    <div>場内人数: <span id="current-count">0</span></div>
+    <div>100人当たり待ち時間: <span id="wait-time">--</span>分</div>
+    <div>1日目: <span id="day1-visitors">0</span>人　2日目: <span id="day2-visitors">0</span>人</div>
+  </div>
+</div>
+
+<div class="counter">
+  <button class="minus1" data-type="out" data-count="1">-1</button>
+
+  <div class="row">
+    <button class="minus5" data-type="out" data-count="5">-5</button>
+    <button class="minus10" data-type="out" data-count="10">-10</button>
+  </div>
+
+  <button class="plus1" data-type="in" data-count="1">出口入場+1</button>
+
+  <button class="menu" onclick="location.href='index.html'">メニューへ戻る</button>
+</div>
+
+<script type="module">
+// Firebase関連 (counter.htmlと同一構成)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, addDoc, collection, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+// ✅ Firebase初期化（自分の設定を反映）
+const firebaseConfig = {
+  // counter.html と同じ設定
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const currentCountValueEl = document.getElementById("current-count");
+const waitTimeValueEl = document.getElementById("wait-time");
+const day1VisitorsEl = document.getElementById("day1-visitors");
+const day2VisitorsEl = document.getElementById("day2-visitors");
+
+// 🔹 ログ参照
+function getLogCollectionRef(db) {
+  return collection(db, "log");
+}
+
+// 🔹 ボタンクリック時の登録処理
+document.querySelectorAll("button[data-type]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const type = btn.getAttribute("data-type");
+    const count = Number(btn.getAttribute("data-count")) || 1;
+    const now = new Date();
+    const event_day = (now.getDate() % 2 === 0) ? "day2" : "day1";
+
+    try {
+      await addDoc(getLogCollectionRef(db), {
+        type: type,
+        count: count,
+        event_day: event_day,
+        timestamp: serverTimestamp(),
+      });
+      console.log(`記録完了: ${type} ${count}`);
+    } catch (e) {
+      console.error("登録失敗:", e);
+    }
+  });
+});
+
+// 🔹 ログの監視・人数/待ち時間計算（counter.htmlと同一）
+onSnapshot(getLogCollectionRef(db), (snapshot) => {
+  let currentCount = 0;
+  let day1TotalIn = 0;
+  let day2TotalIn = 0;
+  let recentInCount = 0;
+
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  const lookbackMinutes = 30;
+  const sinceTime = new Date(now.getTime() - lookbackMinutes * 60000);
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    const type = data.type;
+    const eventDay = data.event_day;
+    const count = data.count || 1;
+    const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+    if (!ts) return;
+
+    const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    if (tsDateStr !== todayStr) return;
+
+    if (type === "in") {
+      currentCount += count;
+      if (eventDay === "day1") day1TotalIn += count;
+      else if (eventDay === "day2") day2TotalIn += count;
+      if (ts >= sinceTime) recentInCount += count;
+    } else if (type === "out") {
+      currentCount -= count;
+    }
+  });
+
+  currentCount = Math.max(0, currentCount);
+  currentCountValueEl.textContent = currentCount.toLocaleString();
+  day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
+  day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
+
+  let waitTimeText = "--";
+  if (recentInCount > 0) {
+    const timePer100 = 3000 / recentInCount;
+    waitTimeText = timePer100.toFixed(1);
+  }
+  waitTimeValueEl.textContent = waitTimeText;
+});
+</script>
+
+</body>
+</html>
