@@ -56,11 +56,11 @@
         <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
             
             <!-- 1. QRコードエリア (左側) -->
-            <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
+            <div id="qr-code-container" class="h-full flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
                 <img id="qr-code-image" 
                     src="qr.png" 
                     alt="QRコード画像をここに配置" 
-                    class="w-full h-full object-contain rounded"
+                    class="max-h-full object-contain rounded"
                     onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
             </div>
 
@@ -365,6 +365,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
