@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待ち時間計算（行列の長さ）</title>
+    <!-- Tailwind CSS CDNを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを優先 */
+        body { font-family: 'Inter', sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f4f7f9; }
+        .container { 
+            max-width: 500px;
+            width: 100%; 
+            margin: 0 auto; 
+            background-color: white; 
+            padding: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
+        }
+        h1 { color: #007bff; font-size: 1.8rem; font-weight: 700; margin-bottom: 1.5rem; }
+        h2 { font-size: 1.5rem; margin-top: 1.5rem; color: #333; }
+        label { display: block; margin-top: 1rem; font-weight: 600; font-size: 1.1rem; color: #4b5563; }
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            margin: 0.5rem 0 1.5rem;
+            box-sizing: border-box;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .result-box {
+            background-color: #d1fae5; /* green-100 */
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            border: 1px solid #10b981; /* green-500 */
+        }
+        .result-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #059669; /* green-600 */
+            display: block;
+        }
+
+        .pace-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+            padding: 0.75rem;
+            background-color: #f3f4f6;
+            border-radius: 8px;
+        }
+        .back-button {
+            display: block;
+            margin-top: 2rem;
+            padding: 10px 20px;
+            background-color: #6b7280;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            transition: background-color 0.2s;
+        }
+        .back-button:hover {
+            background-color: #4b5563;
+        }
+        #event-map {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>待ち時間を算出</h1>
+
+        <!-- ペース情報表示 -->
+        <div class="pace-info">
+            <div id="loading-status" class="text-sm text-blue-600 font-semibold">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                最新データを取得中...
+            </div>
+            <div id="pace-display" class="hidden">
+                現在の入場ペース: <span id="entry-rate" class="font-bold text-gray-800 tabular-nums">---</span> 人/分<br>
+                （参考: 100人あたり <span id="wait-time-100" class="font-bold text-gray-800 tabular-nums">---</span> 分待ち）
+            </div>
+        </div>
+
+        <label for="queue-length">行列の長さ（メートル）</label>
+        <input type="number" id="queue-length" value="10" min="0" oninput="calculateWaitTime()">
+        
+        <h2>推定待ち時間</h2>
+        <div class="result-box">
+            <span id="estimated-wait-time" class="result-value tabular-nums">---</span> 分
+        </div>
+
+        <div class="map-container">
+            <!-- 💡 GASのDriveAppは使用できないため、プレースホルダー画像に置き換え -->
+            <img id="event-map" 
+                 src='https://placehold.co/500x300/e0f2f1/00838f?text=EVENT+MAP+PLACEHOLDER' 
+                 alt="イベント会場マップ">
+            <p class="text-xs text-gray-500 mt-2">※ 画像はプレースホルダーです。実際は会場マップが表示されます。</p>
+        </div>
+
+        <button onclick="window.location.href='index.html'" class="back-button">
+            メニューへ戻る
+        </button>
+    </div>
+
+    <script type="module">
+        // Firebase関連のインポート
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // onAuthStateChanged をインポート
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // onSnapshot, setLogLevel をインポート
+        import { getFirestore, collection, query, where, Timestamp, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 定数（GASから移植） ---
+        const PACE_WINDOW_MINUTES = 30; // 過去指定分間のペースで計算
+        const DEFAULT_WAIT_TIME = 0;    // データ不足時のデフォルト待ち時間 (分)
+        const PEOPLE_PER_METER = 2.5;   // 行列の密度: 1メートルあたり2.5人 (GASと同じ値)
+        
+        // --- Firebase 環境設定（ユーザー提供のロジックを反映） ---
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Failed to parse __firebase_config:", e);
+            }
+        }
+
+        if (!firebaseConfig) {
+            console.warn("環境変数__firebase_configが見つかりません。フォールバック設定を使用します。");
+            firebaseConfig = {
+                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+                authDomain: "setapanmarketcounter.firebaseapp.com",
+                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
+                projectId: "setapanmarketcounter",
+                storageBucket: "setapanmarketcounter.firebasestorage.app",
+                messagingSenderId: "546423839721",
+                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
+                measurementId: "G-70KHJ0P1P1"
+            };
+        }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        let userId = null; // ユーザーIDを保持
+        let isAuthReady = false; // 認証状態の準備完了フラグ
+        let currentEntryRate = 0; // 1分あたりの入場ペース (計算結果を格納)
+        let logData = []; // ログデータを保持 (onSnapshotでリアルタイム更新される)
+
+        // --- UI要素 ---
+        const queueLengthInput = document.getElementById('queue-length');
+        const estimatedWaitTimeElement = document.getElementById('estimated-wait-time');
+        const entryRateElement = document.getElementById('entry-rate');
+        const waitTime100Element = document.getElementById('wait-time-100');
+        const loadingStatusDiv = document.getElementById('loading-status');
+        const paceDisplayDiv = document.getElementById('pace-display');
+
+
+        /**
+         * Firebaseの初期化と認証
+         */
+        async function initFirebase() {
+            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                console.error("Firebase config is missing.");
+                return false;
+            }
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('debug'); // デバッグログを有効化
+
+                // 認証状態の監視と初期認証
+                return new Promise((resolve) => {
+                    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+                        if (!user) {
+                            // 未認証の場合、カスタムトークンがあればサインインを試みる
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken).catch(e => console.error("Custom token sign-in failed:", e));
+                            } else {
+                                // カスタムトークンがなければ匿名認証でサインイン
+                                await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
+                            }
+                            // onAuthStateChangedが再度呼ばれるので、ここでは何もしない
+                            return; 
+                        }
+
+                        // 認証済み
+                        userId = user.uid || crypto.randomUUID();
+                        isAuthReady = true;
+                        unsubscribe(); // 初回認証完了後にリスナーを解除
+                        resolve(true);
+                    }, (error) => {
+                        console.error("Auth state change error:", error);
+                        resolve(false);
+                    });
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                return false;
+            }
+        }
+        
+        /**
+         * ログデータ配列から入場ペースと待ち時間を計算し、UIを更新する
+         * @param {Array<Object>} data - ログデータの配列
+         */
+        function calculatePaceFromLogData(data) {
+            const now = new Date().getTime();
+            const windowStart = now - (PACE_WINDOW_MINUTES * 60 * 1000); 
+
+            let totalEntries = 0;
+            let firstEntryTimeMs = null; 
+
+            // ログを下から（新しいものから）遡って処理するため、時刻でソート
+            // Timestampオブジェクトの比較はtoMillis()で行う
+            const sortedData = [...data].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+
+            for (const log of sortedData) {
+                // 【修正】クライアント側で type のフィルタリングを行う
+                if (log.type !== '入場' || typeof log.count !== 'number' || log.count <= 0) {
+                    continue; // 入場タイプではない、またはカウントが0以下の場合はスキップ
+                }
+
+                const timestampMs = log.timestamp.toMillis();
+
+                if (timestampMs < windowStart) {
+                    break; // 窓口時間外のデータになったら終了
+                }
+                
+                totalEntries += log.count;
+                firstEntryTimeMs = timestampMs; // ループの最後（最も古い）の有効な入場時刻が残る
+            }
+
+            if (totalEntries < 3 || firstEntryTimeMs === null) { 
+                return { entryRate: 0, waitTimePer100: DEFAULT_WAIT_TIME }; 
+            }
+
+            // 処理時間 (分): 現在時刻 - 最も古い有効な入場時刻
+            const timeSpanMinutes = (now - firstEntryTimeMs) / (60 * 1000); 
+
+            if (timeSpanMinutes < 1) {
+                return { entryRate: 0, waitTimePer100: DEFAULT_WAIT_TIME };
+            }
+            
+            const entryRatePerMinute = totalEntries / timeSpanMinutes;
+            const waitTimePer100 = 100 / entryRatePerMinute;
+            
+            return {
+                entryRate: entryRatePerMinute,
+                waitTimePer100: Math.round(waitTimePer100)
+            };
+        }
+
+        /**
+         * Firestoreログのリアルタイムリスナーを設定する
+         */
+        function setupRealtimeLogListener() {
+            if (!db || !isAuthReady) {
+                console.warn("Firestoreまたは認証の準備ができていません。リスナーを設定できません。");
+                return;
+            }
+            
+            // 過去30分間のデータのみを取得するためのクエリ
+            const windowStartTimestamp = Timestamp.fromDate(new Date(Date.now() - (PACE_WINDOW_MINUTES * 60 * 1000)));
+
+            const logsRef = collection(db, `artifacts/${appId}/public/data/logs`);
+            
+            // 複合インデックスエラーを避けるため、timestamp のフィルタのみを使用
+            // 取得データは過去30分間に限定され、古いデータは取得しないためパフォーマンスが良い
+            const q = query(
+                logsRef,
+                where('timestamp', '>=', windowStartTimestamp)
+            );
+
+            // onSnapshotでリアルタイム監視を開始
+            onSnapshot(q, (snapshot) => {
+                logData = [];
+                snapshot.forEach(doc => {
+                    logData.push(doc.data());
+                });
+                
+                // データが更新されたら即座に計算を実行し、UIを更新
+                updatePaceUI();
+
+            }, (error) => {
+                console.error("Firestore Realtime Listener Error:", error);
+                // エラー発生時もUIを更新する（エラー表示）
+                updatePaceUI(true);
+            });
+        }
+
+        /**
+         * UIのペース情報部分を更新する（onSnapshotコールバックから呼び出される）
+         */
+        function updatePaceUI(isError = false) {
+            if (isError) {
+                entryRateElement.innerText = 'エラー';
+                waitTime100Element.innerText = 'エラー';
+                estimatedWaitTimeElement.innerText = 'エラー';
+                loadingStatusDiv.textContent = '🚨 データ取得エラー';
+                loadingStatusDiv.classList.remove('hidden');
+                paceDisplayDiv.classList.add('hidden');
+                return;
+            }
+
+            // ログデータから計算を実行
+            const { entryRate, waitTimePer100 } = calculatePaceFromLogData(logData);
+            currentEntryRate = entryRate;
+
+            // UIを更新
+            entryRateElement.innerText = currentEntryRate > 0.01 ? currentEntryRate.toFixed(2) : '0.00';
+            waitTime100Element.innerText = waitTimePer100;
+
+            // ペース情報表示に切り替え
+            loadingStatusDiv.classList.add('hidden');
+            paceDisplayDiv.classList.remove('hidden');
+
+            // ペース情報が取得できたら待ち時間計算を実行
+            window.calculateWaitTime(); 
+        }
+
+        /**
+         * 待ち時間を計算し、結果を画面に表示する
+         * グローバルスコープから呼び出せるように window に登録
+         */
+        window.calculateWaitTime = function() {
+            const length = parseFloat(queueLengthInput.value);
+            
+            if (isNaN(length) || length < 0) {
+                estimatedWaitTimeElement.innerText = '不正な入力';
+                return;
+            }
+
+            if (currentEntryRate <= 0) {
+                estimatedWaitTimeElement.innerText = '計算不能';
+                return;
+            }
+
+            // 1. 行列人数を計算 (メートル * 2.5人/メートル)
+            const queuePeople = length * PEOPLE_PER_METER;
+
+            // 2. 待ち時間を計算 (人数 / ペース)
+            // 待ち時間 (分) = 行列人数 / (人/分)
+            const waitTime = queuePeople / currentEntryRate;
+            
+            // 3. 結果を表示 (小数点以下を四捨五入して表示)
+            estimatedWaitTimeElement.innerText = Math.round(waitTime);
+        }
+
+        /**
+         * ページロード時の初期化とデータ取得
+         */
+        window.onload = async function() {
+            const isReady = await initFirebase();
+            if (isReady) {
+                // 認証完了後、リアルタイムリスナーを設定
+                setupRealtimeLogListener();
+            } else {
+                loadingStatusDiv.textContent = '🚨 Firebase接続エラー';
+                estimatedWaitTimeElement.innerText = 'エラー';
+            }
+            // 入力値変更時も計算を再実行
+            queueLengthInput.addEventListener('input', window.calculateWaitTime);
+        };
+    </script>
+</body>
+</html>
