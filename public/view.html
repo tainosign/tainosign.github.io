@@ -1,0 +1,675 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+
+// Chart.jsをCDN経由でロードするためのスクリプト
+// Canvas環境では<script>タグが実行され、window.Chartにアクセスできるようになります。
+const CHART_CDN_SCRIPT = (
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+);
+
+// グローバル変数（Canvas環境から提供されることを想定）
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// 初期表示日を、ユーザーの例から暫定的に設定
+const initialDate = 'day2'; // ログ例に合わせて「day2」を初期値とする
+
+// --- データ集計ロジック（元のコードから移植しつつ、生のログ対応に修正） ---
+
+/**
+ * 単位名から表示ラベルを取得
+ */
+const getUnitLabel = (unit) => {
+  return {
+    'second': '1秒', 'minute': '1分', 'ten-minutes': '10分',
+    'thirty-minutes': '30分', 'hour': '1時間'
+  }[unit];
+};
+
+/**
+ * 時刻ラベルの表示をフォーマット
+ */
+const formatTimeLabel = (timeString, unit) => {
+  // timeStringは 'HH:mm:ss' または 'HH:mm' の形式を想定
+  const parts = timeString.split(':');
+  const h = parts[0]; // 時
+  const m = parts[1]; // 分
+  const s = parts[2]; // 秒 (秒単位でない場合は undefined)
+
+  if (unit === 'second') {
+    // 1秒単位: 時\n分\n秒
+    return [h, m, s]; 
+  } else if (unit === 'minute') {
+    // 1分単位: 時\n分
+    return [h, m];
+  } else {
+    // 10分、30分、1時間単位: 時のみ、または時:分
+    return (parts.length > 1 && m !== '00') ? [h, m] : [h];
+  }
+};
+
+/**
+ * データを指定された単位で集計
+ * @param {Array<Object>} timelineData - calculateTimelineで生成されたタイムラインデータオブジェクトの配列
+ * @param {string} unit - 集計単位 ('second', 'minute', 'ten-minutes', 'thirty-minutes', 'hour')
+ */
+const aggregateData = (timelineData, unit) => {
+  // timelineDataの構造: { timestamp: string, currentCount: number, complaintCount: number, complaintDetails: string | null }
+
+  // 'second'単位の場合は、そのままのデータを返す（集計不要）
+  if (unit === 'second') {
+    const labels = [];
+    const attendance = [];
+    const complaint = [];
+    const complaintMap = {};
+
+    timelineData.forEach(row => {
+      // timestamp: "YYYY/MM/DD HH:mm:ss"
+      const timePart = row.timestamp.split(' ')[1]; // HH:mm:ss
+
+      labels.push(timePart);
+      attendance.push(row.currentCount);
+      complaint.push(row.complaintCount);
+
+      if (row.complaintCount > 0 && row.complaintDetails) {
+        // 時刻 HH:mm:ss (秒まで含める)
+        complaintMap[timePart] = row.complaintDetails.replace(/\n/g, ' / ');
+      }
+    });
+
+    return { labels, attendance, complaint, complaintMap };
+  }
+
+  // minute, ten-minutes, thirty-minutes, hour の集計処理
+  const intervalMinutes = {
+    'minute': 1,
+    'ten-minutes': 10,
+    'thirty-minutes': 30,
+    'hour': 60
+  }[unit];
+
+  const aggregated = {};
+
+  timelineData.forEach(row => {
+    const timestampString = row.timestamp;
+    const timestamp = new Date(timestampString.replace(/\//g, '-'));
+
+    if (isNaN(timestamp.getTime())) {
+      console.error(`[AGGREGATE-TIME ERROR] 日時文字列の解析に失敗しました: ${timestampString}`);
+      return;
+    }
+
+    const attendanceCount = row.currentCount;
+    const complaintCount = row.complaintCount;
+    const complaintDetails = row.complaintDetails;
+
+    let hour = timestamp.getHours();
+    let minute = timestamp.getMinutes();
+
+    // 指定されたインターバルに丸める
+    minute = Math.floor(minute / intervalMinutes) * intervalMinutes;
+
+    const minuteStr = String(minute).padStart(2, '0');
+    const hourStr = String(hour).padStart(2, '0');
+    const key = `${hourStr}:${minuteStr}`; // HH:MM (集計キー)
+
+    const fullTimeString = timestampString.split(' ')[1]; // HH:mm:ss
+
+    if (!aggregated[key]) {
+      aggregated[key] = {
+        lastAttendance: attendanceCount, // この集計キーにおける最後の場内人数
+        complaintSum: 0,
+        complaintDetails: []
+      };
+    } else {
+      // 同じ集計期間内に新しい人数が記録された場合、最新の値で上書き
+      aggregated[key].lastAttendance = attendanceCount; 
+    }
+
+    aggregated[key].complaintSum += complaintCount;
+
+    if (complaintDetails) {
+      aggregated[key].complaintDetails.push({
+        time: fullTimeString.substring(0, 8), // HH:mm:ss
+        detail: complaintDetails
+      });
+    }
+  });
+
+  const labels = [];
+  const attendance = [];
+  const complaint = [];
+  const complaintMap = {};
+
+  // 時刻順にソートして配列に格納
+  Object.keys(aggregated).sort().forEach(key => {
+    const item = aggregated[key];
+    labels.push(key);
+    attendance.push(item.lastAttendance);
+    complaint.push(item.complaintSum);
+
+    if (item.complaintDetails.length > 0) {
+      // complaintMapのキーは集計単位の時刻 (HH:MM)
+      complaintMap[key] = item.complaintDetails.map(record => {
+        return `${record.time} ${record.detail}`;
+      }).join('\n---\n');
+    }
+  });
+
+  return { labels, attendance, complaint, complaintMap };
+};
+
+
+/**
+ * 生のログデータからタイムラインデータ（場内人数とトラブル）を計算
+ * @param {Array<Object>} rawLogData - Firestoreから取得したログドキュメントの配列
+ * @param {string} selectedDate - フィルタリング対象の event_day (例: "day1")
+ * @returns {Array<Object>} グラフ描画に必要なタイムラインデータ
+ */
+const calculateTimeline = (rawLogData, selectedDate) => {
+  // 1. 指定された日付でフィルタリング
+  const filteredLogs = rawLogData.filter(log => log.event_day === selectedDate);
+  
+  // 2. タイムスタンプで昇順にソート
+  filteredLogs.sort((a, b) => a.timestamp.toDate().getTime() - b.timestamp.toDate().getTime());
+
+  let currentCount = 0; // 累積場内人数
+  const timeline = [];
+
+  // 3. 累積人数とトラブルを計算
+  filteredLogs.forEach(log => {
+    const logTimestamp = log.timestamp.toDate();
+    const formattedTimestamp = `${logTimestamp.getFullYear()}/${String(logTimestamp.getMonth() + 1).padStart(2, '0')}/${String(logTimestamp.getDate()).padStart(2, '0')} ${String(logTimestamp.getHours()).padStart(2, '0')}:${String(logTimestamp.getMinutes()).padStart(2, '0')}:${String(logTimestamp.getSeconds()).padStart(2, '0')}`;
+    
+    let complaintCount = 0;
+    let complaintDetails = null;
+
+    if (log.type === 'in' || log.type === 'out') {
+      // カウンターログ
+      const countValue = log.count || 1; // countフィールドが存在しない、または0の場合は1として扱う
+      if (log.type === 'in') {
+        currentCount += countValue;
+      } else if (log.type === 'out') {
+        currentCount = Math.max(0, currentCount - countValue); // 0未満にはならない
+      }
+    } else {
+      // トラブル/インシデントログ
+      complaintCount = 1; // ログ1件につき1件のトラブルとしてカウント
+      complaintDetails = `[${log.type}] ${log.content || log.vendor_name || '詳細不明'}`;
+      if (log.place) {
+          complaintDetails += ` (場所: ${log.place})`;
+      }
+    }
+
+    // タイムラインに記録
+    timeline.push({
+      timestamp: formattedTimestamp,
+      currentCount: currentCount,
+      complaintCount: complaintCount,
+      complaintDetails: complaintDetails
+    });
+  });
+
+  return timeline;
+};
+
+
+// --- React Component ---
+
+const App = () => {
+  // State
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
+  
+  // Firestoreから直接取得した生のログデータ（全日付分）
+  const [rawLogData, setRawLogData] = useState([]);
+  // rawLogDataから抽出した利用可能な日付リスト (例: ["day2", "day1"])
+  const [datesList, setDatesList] = useState([]);
+
+  // 選択された日付の集計済みタイムラインデータ (calculateTimelineの結果)
+  const [timelineData, setTimelineData] = useState([]); 
+
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [aggregationUnit, setAggregationUnit] = useState('second');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [modalContent, setModalContent] = useState(null); // モーダルの内容
+
+  // Ref for the Chart.js instance and Canvas
+  const chartRef = useRef(null);
+  const chartInstanceRef = useRef(null);
+
+  // Firestore & Auth 初期化
+  useEffect(() => {
+    try {
+      const isFirebaseConfigMissing = Object.keys(firebaseConfig).length === 0;
+
+      if (isFirebaseConfigMissing) {
+        console.warn("Firebase config is missing. App will only display mock behavior if data is manually provided.");
+        // 設定がない場合、認証をスキップし、手動でロード完了とする
+        setAuth({ currentUser: { uid: 'mock_user' } });
+        setDb({});
+        setUserId('mock_user');
+        setIsLoading(false);
+        return;
+      }
+      
+      const app = initializeApp(firebaseConfig);
+      const firestore = getFirestore(app);
+      const authService = getAuth(app);
+
+      // 認証処理
+      const handleAuth = async () => {
+        try {
+          if (initialAuthToken) {
+            await signInWithCustomToken(authService, initialAuthToken);
+          } else {
+            await signInAnonymously(authService);
+          }
+          const user = authService.currentUser;
+          setUserId(user ? user.uid : crypto.randomUUID());
+        } catch (e) {
+          console.error("Firebase Auth failed:", e);
+          setUserId(crypto.randomUUID()); // 失敗時も匿名IDで続行
+        }
+        setDb(firestore);
+        setAuth(authService);
+        setIsLoading(false);
+      };
+
+      handleAuth();
+    } catch (e) {
+      console.error("Firebase initialization error:", e);
+      setError("Firebaseの初期化に失敗しました。");
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Firestore データ取得/リアルタイムリスナー (logコレクション全体)
+  useEffect(() => {
+    if (!db || isLoading) return;
+
+    // Firebase Configがない場合はログリスナーを起動しない
+    if (Object.keys(firebaseConfig).length === 0) {
+        console.log("No Firebase config. Skipping Firestore log listener.");
+        return;
+    }
+
+    // /artifacts/setapanmarketcounter/public/data/log を購読
+    const logCollectionRef = collection(db, `artifacts/${appId}/public/data/log`);
+    // NOTE: onSnapshotでorderByを使用するとインデックスが必要になる可能性があるため、
+    // ここではorderByを使わず、取得後にJavaScript側でソート/フィルタリングを行います。
+    const logQuery = logCollectionRef; 
+    console.log(`[Firestore] Subscribing to: log collection.`);
+
+    const unsubscribe = onSnapshot(logQuery, (snapshot) => {
+      const logs = [];
+      const uniqueDays = new Set();
+      let latestDate = null;
+
+      snapshot.forEach(doc => {
+        const log = doc.data();
+        if (log.timestamp && log.event_day) {
+            logs.push(log);
+            uniqueDays.add(log.event_day);
+
+            // 最新日付を特定
+            const logDate = log.timestamp.toDate().getTime();
+            if (latestDate === null || logDate > latestDate.time) {
+                latestDate = { day: log.event_day, time: logDate };
+            }
+        }
+      });
+      
+      setRawLogData(logs);
+      
+      // 日付リストを降順にソートして設定
+      const sortedDays = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a));
+      setDatesList(sortedDays);
+
+      // ログが全くない場合、または初期表示日が存在しない場合は最新の日付に設定
+      if (sortedDays.length > 0) {
+        if (!sortedDays.includes(selectedDate) && latestDate) {
+            setSelectedDate(latestDate.day);
+        } else if (!selectedDate) {
+            setSelectedDate(sortedDays[0]);
+        }
+      }
+      
+      console.log(`[Firestore] Log data received. Total entries: ${logs.length}, Unique days: ${sortedDays.length}`);
+    }, (err) => {
+      console.error("Firestore listen error (log):", err);
+      setError("ログデータの読み込み中にエラーが発生しました。");
+    });
+
+    return () => unsubscribe();
+  }, [db, isLoading]); // db, isLoading が変更されたら再実行
+
+  // rawLogDataまたはselectedDateが変更されたときにタイムラインを再計算
+  useEffect(() => {
+    if (rawLogData.length > 0 && selectedDate) {
+        const calculatedTimeline = calculateTimeline(rawLogData, selectedDate);
+        setTimelineData(calculatedTimeline);
+        console.log(`[Recalculate] Timeline for ${selectedDate} updated. Entries: ${calculatedTimeline.length}`);
+    } else if (selectedDate) {
+        setTimelineData([]);
+        console.log(`[Recalculate] No raw data found for ${selectedDate}.`);
+    }
+  }, [rawLogData, selectedDate]);
+
+
+  // Chart.js 描画ロジック
+  const drawChart = useCallback(() => {
+    // Chart.jsオブジェクトのチェック
+    if (!window.Chart || !chartRef.current || !timelineData || timelineData.length === 0) {
+      if (!isLoading) {
+        const message = !window.Chart 
+          ? 'Chart.jsが読み込まれていません。'
+          : `${selectedDate} の記録がありません。`;
+
+        // エラーメッセージの表示
+        const canvasElement = chartRef.current;
+        if (canvasElement) {
+          const context = canvasElement.getContext('2d');
+          context.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          context.font = "16px Inter, sans-serif";
+          context.textAlign = "center";
+          context.fillStyle = "#6b7280"; // gray-500
+          context.fillText(message, canvasElement.width / 2, canvasElement.height / 2);
+        }
+      }
+      return;
+    }
+
+    // 集計単位に基づいてデータを準備
+    const { labels, attendance, complaint, complaintMap } = aggregateData(timelineData, aggregationUnit);
+
+    const ctx = chartRef.current.getContext('2d');
+
+    // 既存のチャートがあれば破棄
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy();
+    }
+    
+    // 最大人数と最大報告件数を計算
+    const maxAttendance = Math.max(10, ...attendance);
+    const maxComplaint = Math.max(1, ...complaint);
+
+    try {
+      chartInstanceRef.current = new window.Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '場内人数',
+              data: attendance,
+              yAxisID: 'y1',
+              borderColor: 'rgba(52, 211, 153, 1)', // Tailwind emerald-400
+              backgroundColor: 'rgba(52, 211, 153, 0.4)',
+              tension: 0.2,
+              fill: false,
+              pointRadius: (aggregationUnit === 'second' || aggregationUnit === 'minute') ? 3 : 0
+            },
+            {
+              label: 'トラブル等記録件数',
+              data: complaint,
+              yAxisID: 'y2',
+              borderColor: 'rgba(239, 68, 68, 1)', // Tailwind red-500
+              backgroundColor: 'rgba(239, 68, 68, 0.7)',
+              type: 'bar',
+              order: 1,
+              pointRadius: 0,
+              barPercentage: 0.8
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 500 },
+          onClick: (e) => {
+            const chart = chartInstanceRef.current;
+            if (!chart) return;
+
+            const activePoints = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+            if (activePoints.length > 0) {
+              const firstPoint = activePoints[0];
+              const label = labels[firstPoint.index]; // HH:mm:ss または HH:mm
+
+              if (complaintMap[label]) {
+                setModalContent({
+                  title: `【トラブル等記録内容 - ${label}】`,
+                  details: complaintMap[label]
+                });
+              }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: `${selectedDate} の場内/トラブル等記録推移 (${getUnitLabel(aggregationUnit)}単位)`,
+              font: { size: 18, family: 'Inter, sans-serif' }
+            },
+            legend: {
+              position: 'bottom',
+              labels: { font: { size: 14, family: 'Inter, sans-serif' } }
+            },
+            tooltip: {
+              bodyFont: { size: 14, family: 'Inter, sans-serif' },
+              titleFont: { size: 14, family: 'Inter, sans-serif' }
+            }
+          },
+          scales: {
+            y1: {
+              type: 'linear', position: 'left',
+              title: { display: true, text: '場内人数', font: { size: 18, family: 'Inter, sans-serif' } },
+              beginAtZero: true,
+              max: maxAttendance * 1.1, // 最大値より少し上を設定
+              ticks: { font: { size: 14, family: 'Inter, sans-serif' } }
+            },
+            y2: {
+              type: 'linear', position: 'right',
+              title: { display: true, text: 'トラブル等件数 (集計)', font: { size: 18, family: 'Inter, sans-serif' } },
+              min: 0,
+              max: maxComplaint * 1.2, // 最大値より少し上を設定
+              grid: { drawOnChartArea: false },
+              ticks: { stepSize: 1, font: { size: 14, family: 'Inter, sans-serif' } }
+            },
+            x: {
+              title: { display: true, text: '時刻', font: { size: 18, family: 'Inter, sans-serif' } },
+              ticks: {
+                autoSkip: true,
+                maxRotation: 0,
+                minRotation: 0,
+                font: { size: 14, family: 'Inter, sans-serif' },
+                callback: function(val) {
+                  const fullTime = labels[val]; // ラベル配列から値を取得
+                  return formatTimeLabel(fullTime, aggregationUnit);
+                }
+              }
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.error("[CHART ERROR] Chart.js failed to draw:", e);
+      setError("グラフ描画中にエラーが発生しました。");
+    }
+  }, [timelineData, aggregationUnit, selectedDate, isLoading]);
+
+  // データまたは単位の変更時にチャートを再描画
+  useEffect(() => {
+    if (!isLoading) {
+      drawChart();
+      // 60秒ごとの自動更新を設定
+      const intervalId = setInterval(drawChart, 60000);
+      return () => clearInterval(intervalId);
+    }
+  }, [drawChart, isLoading]);
+
+  // 日付変更ハンドラ
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
+  };
+
+  // 単位変更ハンドラ
+  const handleUnitChange = (unit) => {
+    setAggregationUnit(unit);
+  };
+
+  const unitButtons = ['second', 'minute', 'ten-minutes', 'thirty-minutes', 'hour'].map(unit => (
+    <button
+      key={unit}
+      onClick={() => handleUnitChange(unit)}
+      className={`
+        flex-shrink-0 min-w-[18%] p-3 text-sm sm:text-base font-semibold rounded-lg transition duration-200 shadow-md 
+        ${aggregationUnit === unit 
+          ? 'bg-blue-600 text-white shadow-blue-400/50 hover:bg-blue-700' 
+          : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
+        }
+      `}
+    >
+      {getUnitLabel(unit)}
+    </button>
+  ));
+  
+  // ロード中の表示
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center p-8 bg-white rounded-xl shadow-lg">
+          <svg className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-gray-700 font-semibold">データを準備中... (ログをロードして集計しています)</p>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー時の表示
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-red-50">
+        <div className="p-8 bg-white rounded-xl shadow-lg border border-red-400">
+          <h2 className="text-xl font-bold text-red-600 mb-2">エラーが発生しました</h2>
+          <p className="text-gray-700">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // トラブル詳細モーダルコンポーネント
+  const Modal = ({ title, details, onClose }) => {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-red-500 text-white">
+            <h3 className="text-lg font-bold">{title}</h3>
+            <button onClick={onClose} className="text-white hover:text-gray-200">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="p-6 max-h-[70vh] overflow-y-auto whitespace-pre-wrap text-gray-700 text-sm">
+            {details}
+          </div>
+          <div className="p-4 border-t border-gray-200 text-right">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition duration-150"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-['Inter']">
+      {CHART_CDN_SCRIPT}
+      <header className="text-center mb-6">
+        <h1 className="text-4xl font-extrabold text-blue-600 tracking-tight">場内人数・イベントログ推移リアルタイムビュー</h1>
+        <p className="text-sm text-gray-500 mt-1">最終更新: {new Date().toLocaleTimeString('ja-JP', { hour12: false })}</p>
+      </header>
+        {/* グラフコンテナ */}
+        <div className="bg-white rounded-xl shadow-xl p-4 sm:p-6 mb-6 h-[70vh] min-h-[400px]">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">場内人数とトラブル記録の推移</h2>
+          <div className="h-full w-full relative">
+            {(timelineData.length === 0 && !isLoading) ? (
+              <div className="absolute inset-0 flex items-center justify-center text-xl text-gray-500">
+                <p>**{selectedDate}** のログデータがありません。</p>
+              </div>
+            ) : (
+              <canvas ref={chartRef} id="chart_div"></canvas>
+            )}
+          </div>
+        </div>
+      <div className="max-w-4xl mx-auto">
+        {/* 日付選択コントロール */}
+        <div className="bg-white p-4 rounded-xl shadow-lg mb-6">
+          <label htmlFor="dateSelector" className="block text-lg font-bold text-gray-700 mb-3">表示するイベント日を選択 (event_day):</label>
+          <select
+            id="dateSelector"
+            value={selectedDate}
+            onChange={handleDateChange}
+            className="w-full p-3 text-lg border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm"
+          >
+            {datesList.length > 0 ? (
+                datesList.map(date => (
+                    <option key={date} value={date}>{date}</option>
+                ))
+            ) : (
+                <option value={selectedDate}>{selectedDate} (ログなし)</option>
+            )}
+          </select>
+        </div>
+
+        {/* 単位選択コントロール */}
+        <div className="bg-white p-4 rounded-xl shadow-lg mb-6">
+          <label className="block text-lg font-bold text-gray-700 mb-3">表示単位:</label>
+          <div className="flex flex-wrap justify-between gap-2 overflow-x-auto p-1">
+            {unitButtons}
+          </div>
+        </div>
+        
+
+
+        {/* ユーザーID表示（デバッグ・連携用） */}
+        <div className="text-sm text-gray-500 text-center p-3 rounded-lg bg-white shadow-sm mb-6">
+          <p>
+            **現在のユーザーID**: <span className="font-mono text-xs break-all">{userId || '認証中...'}</span>
+          </p>
+        </div>
+
+        {/* メニューへ戻るボタン (デモ) */}
+        <div className="text-center">
+          <button
+            onClick={() => console.log('メニューへ戻るボタンがクリックされました')}
+            className="w-full max-w-lg py-3 bg-gray-500 text-white font-semibold text-lg rounded-xl shadow-lg hover:bg-gray-600 transition duration-200"
+          >
+            メニューへ戻る (デモ)
+          </button>
+        </div>
+      </div>
+      
+      {/* モーダル表示 */}
+      {modalContent && (
+        <Modal
+          title={modalContent.title}
+          details={modalContent.details}
+          onClose={() => setModalContent(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default App;
