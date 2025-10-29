@@ -340,6 +340,20 @@
     </div>
 
 <script>
+    document.addEventListener("DOMContentLoaded", () => {
+  if (window.externalAPI) {
+    window.externalAPI.initializeViewAfterAuth = initializeView;
+    window.externalAPI.onFailure = onFailure;
+  } else {
+    const checkAPI = setInterval(() => {
+      if (window.externalAPI) {
+        window.externalAPI.initializeViewAfterAuth = initializeView;
+        window.externalAPI.onFailure = onFailure;
+        clearInterval(checkAPI);
+      }
+    }, 100);
+  }
+});
     // --- 4. クライアントサイドのコアロジック ---
     const dateSelector = document.getElementById('dateSelector');
     const statusDiv = document.getElementById('status');
@@ -394,8 +408,8 @@
     });
     
     // // --- Firebase認証完了後に実行される初期化関数 (import scriptからコールされる) ---
-    window.externalAPI.initializeViewAfterAuth = initializeView;
-    window.externalAPI.onFailure = onFailure;
+  //  window.externalAPI.initializeViewAfterAuth = initializeView;
+   // window.externalAPI.onFailure = onFailure;
 
 
     function setupAutoRefresh() {
