@@ -182,75 +182,7 @@ async function fetchRecordedDates() {
     }
 }
         
-        /**
-         * 特定の日付の全ログを取得し、場内人数と報告件数を計算する
-         * @param {string} date YYYY-MM-DD形式の日付
-         * @returns {Promise<Array<Array<any>>>} グラフ描画用のデータ配列
-         */
-        async function fetchDailyCountTimeline(date) {
-            console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
-            let currentCount = 0;
-            const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
-            
-            try {
-                // dateフィールドが一致するドキュメントをtimestamp順に取得
-                const q = query(
-                    collection(db, LOG_COLLECTION_PATH),
-                    where("date", "==", date),
-                    orderBy("timestamp", "asc")
-                );
 
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    console.log(`Firestore: **${date}** のログデータは見つかりませんでした。`);
-                    return chartData;
-                }
-
-                querySnapshot.forEach((doc) => {
-                    const row = doc.data();
-                    
-                    // Firestore TimestampをJavaScript Dateオブジェクトに変換
-                    const timestampDate = row.timestamp ? row.timestamp.toDate() : new Date();
-                    
-                    // タイムスタンプを 'YYYY/MM/DD HH:mm:ss' 形式の文字列に変換
-                    const formattedTimestamp = timestampDate.toLocaleDateString('ja-JP', {
-                        year: 'numeric', month: '2-digit', day: '2-digit', 
-                        hour: '2-digit', minute: '2-digit', second: '2-digit', 
-                        hour12: false
-                    }).replace(/\//g, '/').replace(/ /g, ' ').replace(',', '');
-                    
-                    // --- 入退場計算 ---
-                    const entryCount = row.entry || 0;
-                    const exitCount = row.exit || 0;
-                    currentCount += (entryCount - exitCount);
-                    currentCount = Math.max(0, currentCount); // 人数は0未満にならない
-
-                    const isCounted = (entryCount > 0 || exitCount > 0);
-                    
-                    // --- 報告内容集約 ---
-                    const vendorDetails = row.vendorDetails || '';
-                    const visitorDetails = row.visitorDetails || '';
-                    const otherDetails = row.otherDetails || '';
-                    
-                    let complaintDetails = '';
-                    if (vendorDetails) complaintDetails += `[出店者] ${vendorDetails}\n`;
-                    if (visitorDetails) complaintDetails += `[来場者] ${visitorDetails}\n`;
-                    if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
-                    
-                    complaintDetails = complaintDetails.trim() || null; 
-                    const complaintCount = complaintDetails ? 1 : 0;
-                    
-                    // グラフ用にデータを追加
-                    if (isCounted || complaintCount > 0) {
-                        chartData.push([
-                            formattedTimestamp.split(' ')[1], // 時刻部分 (HH:mm:ss) のみを使用
-                            currentCount,    
-                            complaintCount,   
-                            complaintDetails  
-                        ]);
-                    }
-                });
                     
 async function fetchDailyCountTimeline(date) {
     console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
