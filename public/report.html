@@ -41,9 +41,6 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        let db, auth;
-        let userId = null;
-
         // Firestoreのパス生成ヘルパー関数
         function getLogCollectionRef(dbInstance) {
             return collection(dbInstance, `/artifacts/${appId}/public/data/log`);
