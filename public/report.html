@@ -15,9 +15,6 @@
         let db, auth;
         let userId = null;
         let vendorSelect; // <select id="place"> 要素を格納する変数
-        // ----------------------------------------------------
-        // 1. Firebase設定とグローバル変数 (index.htmlから継承)
-        // ----------------------------------------------------
         let firebaseConfig = null;
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
             try {
@@ -60,9 +57,7 @@
                 timestampInput.value = now.toISOString().slice(0, 16);
             }
         }
-        // ----------------------------------------------------
-        // 1. Firebase初期化と認証
-        // ----------------------------------------------------
+
         async function initializeAppAndAuth() {
             updateCurrentDateTime();
             setInterval(updateCurrentDateTime, 1000); // 1秒ごとに時刻を更新
@@ -101,9 +96,6 @@
             }
         }
 
-        // ----------------------------------------------------
-        // 2. 出店者リスト定義 (GASのVENDOR_LISTを移植)
-        // ----------------------------------------------------
         const VENDOR_LIST = {
     'day1': [
         '1. COBOTO BAKERY SHOP', '2. BAKE (両日)', '3. KIN-KIN', '4. CNN', '5. パン焼き小屋', '6. ドイツパンの店 リンデ', 
@@ -262,14 +254,7 @@
     ]
 };
         
-        // ----------------------------------------------------
-        // 3. 出店者リストのHTML生成ロジック (GASから移植)
-        // ----------------------------------------------------
-        /**
-         * 指定された日の出店者リストから <option> タグを生成し、ジャンルごとに <optgroup> でグループ化します。
-         * @param {string} dayStr - '1'または'2'。
-         * @return {string} HTMLオプションタグの文字列。
-         */
+
         function generateVendorOptionsGrouped(dayStr) {
             const list = VENDOR_LIST[`day${dayStr}`] || [];
             let html = '';
@@ -291,19 +276,21 @@
                 let category = 'その他';
                 
                 // GASの分類ロジック
-                if (num >= 1 && num <= 56) {
-                    category = 'パン・マーケット';
-                } else if (num >= 60 && num <= 79) {
-                    category = 'パンのおとも';
-                } else if (num >= 80 && num <= 81) {
-                    category = 'グッズ/フードドライブ';
-                } else if (num >= 83 && num <= 108) {
-                    category = 'ドリンク＆フード';
-                } else if ([57, 58, 59, 82, 109, 110, 111].includes(num) || fullName.includes('協賛')) {
-                     category = '協賛';
-                } else if (num >= 110 && num <= 122) {
-                    category = 'HWVとパン大学';
-                }
+                if (num >= 1 && num <= 56) {
+                    category = 'パン・マーケット';
+                } else if (num >= 60 && num <= 79) {
+                    category = 'パンのおとも';
+                } else if (num >= 80 && num <= 81) {
+                    category = 'グッズ/フードドライブ';
+                } else if (num >= 83 && num <= 108) {
+                    category = 'ドリンク＆フード';
+                } else if (num >= 110 && num <= 121) { // HWVとパン大学の範囲を明確に定義 (122を除く)
+                    category = 'HWVとパン大学';
+                }
+                // 個別番号と「協賛」を含むものをチェック (HWVとパン大学と重複する番号を削除)
+                else if ([57, 58, 59, 82, 122].includes(num) || fullName.includes('協賛')) { // 109, 110, 111を削除し、122を追加
+                    category = '協賛';
+                }
                 
                 // 存在しないカテゴリへの追加を防ぐ
                 if (groups[category]) {
@@ -335,13 +322,6 @@
             return html;
         }
 
-        // ----------------------------------------------------
-        // 4. Firestoreへのデータ記録ロジック (GASのrecordreportを移植)
-        // ----------------------------------------------------
-        /**
-         * 報告データをFirestoreに記録します。
-         * @param {Object} formData - フォームデータを含むオブジェクト
-         */
         async function recordReport(formData) {
             if (!db) {
                 console.error("Firestoreが初期化されていません。");
@@ -390,10 +370,6 @@
                 type: formData.report_type
             };
         }
-
-        // ----------------------------------------------------
-        // 5. DOM操作とイベントリスナー
-        // ----------------------------------------------------
 
         function updateVendorList() {
             // vendorSelect がまだ DOM に存在しないか、参照できていない場合は処理を中断
