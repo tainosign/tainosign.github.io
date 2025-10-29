@@ -239,27 +239,73 @@ async function fetchRecordedDates() {
                     if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
                     
                     complaintDetails = complaintDetails.trim() || null; 
-                    const complaintCount = complaintDetails ? 1 : 0;
-                    
-                    // グラフ用にデータを追加
-                    if (isCounted || complaintCount > 0) {
-                        chartData.push([
-                            formattedTimestamp.split(' ')[1], // 時刻部分 (HH:mm:ss) のみを使用
-                            currentCount,    
-                            complaintCount,   
-                            complaintDetails  
-                        ]);
-                    }
-                });
+async function fetchDailyCountTimeline(date) {
+    console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
+    let currentCount = 0;
+    const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
+    
+    try {
+        // 🔹 指定日の00:00〜23:59までを日本時間で取得
+        const start = new Date(`${date}T00:00:00+09:00`);
+        const end = new Date(`${date}T23:59:59+09:00`);
 
-                console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
-                return chartData;
+        const q = query(
+            collection(db, LOG_COLLECTION_PATH),
+            where("timestamp", ">=", start),
+            where("timestamp", "<=", end),
+            orderBy("timestamp", "asc")
+        );
 
-            } catch (e) {
-                console.error("Firestore: タイムラインデータの取得に失敗しました", e);
-                throw new Error("タイムラインデータの取得に失敗しました: " + e.message);
-            }
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            console.log(`Firestore: **${date}** のログデータは見つかりませんでした。`);
+            return chartData;
         }
+
+        querySnapshot.forEach((doc) => {
+            const row = doc.data();
+            const timestampDate = row.timestamp?.toDate ? row.timestamp.toDate() : new Date(row.timestamp);
+
+            const formattedTimestamp = timestampDate.toLocaleString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            const entryCount = row.type === "in" ? (row.count || 0) : 0;
+            const exitCount = row.type === "out" ? (row.count || 0) : 0;
+            currentCount += entryCount - exitCount;
+            currentCount = Math.max(0, currentCount);
+
+            // 報告内容
+            const vendorDetails = row.vendorDetails || '';
+            const visitorDetails = row.visitorDetails || '';
+            const otherDetails = row.otherDetails || '';
+            let complaintDetails = '';
+            if (vendorDetails) complaintDetails += `[出店者] ${vendorDetails}\n`;
+            if (visitorDetails) complaintDetails += `[来場者] ${visitorDetails}\n`;
+            if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
+            complaintDetails = complaintDetails.trim() || null;
+            const complaintCount = complaintDetails ? 1 : 0;
+
+            // グラフ用データ追加
+            chartData.push([
+                formattedTimestamp,
+                currentCount,
+                complaintCount,
+                complaintDetails
+            ]);
+        });
+
+        console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
+        return chartData;
+
+    } catch (e) {
+        console.error("Firestore: タイムラインデータの取得に失敗しました", e);
+        throw new Error("タイムラインデータの取得に失敗しました: " + e.message);
+    }
+                }
         
         // --- 3. グローバルなAPIをエクスポートして、HTML側のスクリプトから呼び出せるようにする ---
         window.externalAPI = {
