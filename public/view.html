@@ -639,15 +639,16 @@ callback: function(value, index, ticks) {
             
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
-                const timePart = row[0];
+                const timePart = row[0]; // HH:mm:ss
                 
                 labels.push(timePart);
-                attendance.push(row.count || 0);
-                complaint.push(row.count || 0);
+                attendance.push(row[1]);
+                complaint.push(row[2]);
                 
-            if ((row.count || 0) > 0) {
-                complaintMap[timePart] = `(${timePart}) [${row.place}] [${row.type}] ${row.content} (${row.reporter})`;
-            }
+                if (row[2] > 0 && row[3]) {
+                    // complaintMapにはHH:mm:ssと詳細を格納
+                    complaintMap[timePart] = `${timePart} ${row[3]}`; 
+                }
             }
             return { labels, attendance, complaint, complaintMap };
         }
@@ -673,12 +674,9 @@ callback: function(value, index, ticks) {
                 continue;
             }
             
-        const attendanceCount = row.count || 0;
-        const complaintCount = row.count || 0;
-
-            // const attendanceCount = row[1];
-            // const complaintCount = row[2];
-            // const complaintDetails = row[3];
+            const attendanceCount = row[1];
+            const complaintCount = row[2];
+            const complaintDetails = row[3];
             
             let hour = timestamp.getHours();
             let minute = timestamp.getMinutes();
@@ -714,6 +712,29 @@ callback: function(value, index, ticks) {
                 });
             }
         }
+
+        const labels = [];
+        const attendance = [];
+        const complaint = [];
+        const complaintMap = {};
+
+        // 集計キーでソートして最終データを作成
+        Object.keys(aggregated).sort().forEach(key => {
+            const item = aggregated[key];
+            labels.push(key);
+            attendance.push(item.lastAttendance);
+            complaint.push(item.complaintSum);
+            
+            if (item.complaintDetails.length > 0) {
+                // 集計単位の時刻 (HH:mm) に紐づく全てのトラブル詳細を結合
+                complaintMap[key] = item.complaintDetails.map(record => {
+                    return `(${record.time}) [${record.place}] [${record.type}] ${record.detail} (${record.reporter})`;
+                }).join('\n----------\n'); 
+            }
+        });
+        
+        return { labels, attendance, complaint, complaintMap };
+    }
 
         const labels = [];
         const attendance = [];
