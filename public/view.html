@@ -183,7 +183,7 @@ async function fetchDailyCountTimeline(dateStr) {
 console.log("渡された dateStr:", dateStr, typeof dateStr);
         const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
     const dates = new Set();
-      try {
+
 
   // ✅ "2025/10/30" → Date("2025/10/30 00:00:00")
   let date;
@@ -201,7 +201,8 @@ console.log("渡された dateStr:", dateStr, typeof dateStr);
   endOfDay.setHours(23, 59, 59, 999);
 
   console.log("startOfDay:", startOfDay.toLocaleString(), "endOfDay:", endOfDay.toLocaleString());
-
+    
+try {
   // ✅ Firestore クエリ（例）
   const q = query(
     collection(db, getPublicCollectionPath("timeline")),
