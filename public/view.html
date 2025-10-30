@@ -670,7 +670,16 @@ const timePart = tsString.split(' ')[1]; // HH:mm:ss を抽出
 
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            const timestampString = row[0]; // HH:mm:ss
+            // const timestampString = row[0]; // HH:mm:ss
+
+                            const timestampString = row.timestamp
+                    ? (typeof row.timestamp === 'string' ? row.timestamp : row.timestamp.toDate?.()?.toISOString())
+                    : null;
+if (!tsString) {
+    console.warn('timestamp missing for row', row);
+    continue; // timestamp がなければこの行はスキップ
+}
+            
             // const timestampString = row.timestamp.split(' ')[1];
             
             // 日付情報がないため、今日のダミー日付を使ってDateオブジェクトを作成
