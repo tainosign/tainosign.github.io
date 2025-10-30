@@ -230,7 +230,7 @@ try {
     const complaintCount = complaintDetails ? 1 : 0;
 
     if (!window.currentCount) window.currentCount = 0;
-    if (row.type === 'in' || type === 'exitin') window.currentCount += row.count || 0;
+    if (row.type === 'in' || row.type === 'exitin') window.currentCount += row.count || 0;
     if (row.type === 'out') window.currentCount -= row.count || 0;
     window.currentCount = Math.max(0, window.currentCount);
 
