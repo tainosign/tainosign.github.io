@@ -636,7 +636,8 @@ callback: function(value, index, ticks) {
             
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
-                const timePart = row.timestamp.split(' ')[1];  // HH:mm:ss
+                // const timePart = row.timestamp.split(' ')[1];  // HH:mm:ss
+                const timePart = row[0];
                 
                 labels.push(timePart);
                 attendance.push(row.count || 0);
@@ -660,8 +661,8 @@ callback: function(value, index, ticks) {
 
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            // const timestampString = row[0]; // HH:mm:ss
-            const timestampString = row.timestamp.split(' ')[1];
+            const timestampString = row[0]; // HH:mm:ss
+            // const timestampString = row.timestamp.split(' ')[1];
             
             // 日付情報がないため、今日のダミー日付を使ってDateオブジェクトを作成
             const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
