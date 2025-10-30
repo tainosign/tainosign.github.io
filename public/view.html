@@ -702,7 +702,8 @@ callback: function(value, index, ticks) {
                 // 時刻情報 (HH:mm:ss) と内容をセットにしたオブジェクトを配列にプッシュ
                 aggregated[key].complaintDetails.push({
                     time: timestampString, // HH:mm:ss
-                    detail: complaintDetails
+                    detail: complaintDetails,
+                    vendor: row.vendor_name || ''
                 });
             }
         }
@@ -722,7 +723,7 @@ callback: function(value, index, ticks) {
             if (item.complaintDetails.length > 0) {
                 // 集計単位の時刻 (HH:mm) に紐づく全てのトラブル詳細を結合
                 complaintMap[key] = item.complaintDetails.map(record => {
-                    return `(${record.time}) ${record.detail}`; 
+                    return `(${record.time}) [${record.vendor}] ${record.detail}`; 
                 }).join('\n----------\n'); 
             }
         });
