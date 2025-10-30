@@ -646,7 +646,8 @@ callback: function(value, index, ticks) {
                 
                 if (row[2] > 0 && row[3]) {
                     // complaintMapにはHH:mm:ssと詳細を格納
-                    complaintMap[timePart] = `${timePart} ${row[3]}`; 
+                    // complaintMap[timePart] = `${timePart} ${row[3]}`; 
+                    complaintMap[timePart] = `(${timePart}) [${row[4]}] [${row[5]}] ${row[3]} (${row[6]})`;
                 }
             }
             return { labels, attendance, complaint, complaintMap };
