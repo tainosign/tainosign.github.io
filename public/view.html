@@ -162,19 +162,21 @@ async function fetchRecordedDates() {
 
         const querySnapshot = await getDocs(q);
 
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.timestamp) {
-                // ✅ timestamp → JS Date に変換して日付文字列にする
-                const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-                const dateStr = ts.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
-                dates.add(dateStr);
-            }
-        });
+querySnapshot.forEach((doc) => {
+  const data = doc.data();
+  if (data.timestamp) {
+    const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+    ts.setHours(0, 0, 0, 0); // 同じ日の扱いに統一
+    dates.add(ts.getTime()); // 数値でSetに入れる
+  }
+});
 
-        const uniqueDates = Array.from(dates).sort().reverse();
-        console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
-        return uniqueDates;
+const uniqueDates = Array.from(dates)
+  .sort((a, b) => b - a)
+  .map((t) => new Date(t)); // ✅ Dateオブジェクトの配列で返す
+
+console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
+return uniqueDates;
 
     } catch (e) {
         console.error("Firestore: 日付リストの取得に失敗しました", e);
