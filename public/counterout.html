@@ -236,7 +236,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     // 🔹過去◯分（可変）を設定
-    const lookbackMinutes = 30; // ←ここを変えれば可変
+    const lookbackMinutes = 10; // ←ここを変えれば可変
     const lookbackMs = lookbackMinutes * 60 * 1000;
     const sinceTime = new Date(now.getTime() - lookbackMs);
 
