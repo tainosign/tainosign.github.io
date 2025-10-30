@@ -239,7 +239,7 @@
                 if (tsDateStr !== todayStr) return; 
 
                 // 当日データを集計
-                if (type === 'in') {
+                if (type === 'in' || type === 'exitin') {
                     currentCount += count;
                     if (eventDay === 'day1') day1TotalIn += count;
                     else if (eventDay === 'day2') day2TotalIn += count;
@@ -364,6 +364,7 @@
     </script>
 </body>
 </html>
+
 
 
 
