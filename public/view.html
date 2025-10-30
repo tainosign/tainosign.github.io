@@ -519,8 +519,11 @@ async function drawChart(date) {
         const attendanceData = aggregated.attendance;
         const complaintData = aggregated.complaint;
         const complaintMap = aggregated.complaintMap;
-
         const chartElement = document.getElementById('chart_div');
+
+console.log("[DEBUG] complaintData:", complaintData);
+console.log("[DEBUG] complaintMap:", complaintMap);
+        
         if (!chartElement) {
             console.error(`[DOM ERROR] ID 'chart_div' の canvas 要素が見つかりません。`);
             return;
@@ -621,14 +624,6 @@ callback: function(value, index, ticks) {
   return formatTimeLabel(label, currentUnit);
 }
 
-                                    // 秒・分単位では5分ごとにラベルを表示するロジックを再現
-                                    // if (currentUnit === 'second' || currentUnit === 'minute') {
-                                    //     const parts = fullTime.split(':'); 
-                                    //     const minutes = parseInt(parts[1]);
-                                    //     if (minutes % 5 !== 0) return '';
-                                    // }
-                                    // return formatTimeLabel(fullTime, currentUnit);
-                                // }
                             }
                         }
                     }
@@ -754,25 +749,20 @@ callback: function(value, index, ticks) {
         }[unit];
     }
 
-    function formatTimeLabel(timeString, unit) {
-        // timeStringは 'HH:mm:ss' または 'HH:mm' の形式を想定
-        const parts = timeString.split(':');
+function formatTimeLabel(timeString, unit) {
+  const parts = timeString.split(':');
+  const h = parts[0];
+  const m = parts[1];
+  const s = parts[2];
 
-        const h = parts[0]; // 時
-        const m = parts[1]; // 分
-        const s = parts[2]; // 秒 
-
-        if (unit === 'second') {
-            // 1秒単位: 時\n分\n秒
-            return [h, m, s];
-        } else if (unit === 'minute') {
-            // 1分単位: 時\n分
-            return [h, m];
-        } else {
-            // 10分、30分、1時間単位: 時のみ、または時:分
-            return (parts.length > 1 && m !== '00') ? [h, m] : [h];
-        }
-    }
+  if (unit === 'second') {
+    return `${h}\n${m}\n${s}`;
+  } else if (unit === 'minute') {
+    return `${h}\n${m}`;
+  } else {
+    return (parts.length > 1 && m !== '00') ? `${h}:${m}` : h;
+  }
+}
     
     function onFailure(error) {
         if (autoRefreshTimer) {
