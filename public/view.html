@@ -704,7 +704,8 @@ callback: function(value, index, ticks) {
                     time: timestampString, // HH:mm:ss
                     detail: complaintDetails,
                     place: row.place || '',
-                    type: row.type || ''
+                    type: row.type || '',
+                    reporter: row.reporter || ''
                 });
             }
         }
@@ -724,7 +725,7 @@ callback: function(value, index, ticks) {
             if (item.complaintDetails.length > 0) {
                 // 集計単位の時刻 (HH:mm) に紐づく全てのトラブル詳細を結合
                 complaintMap[key] = item.complaintDetails.map(record => {
-                    return `(${record.time}) [${record.place}] [${record.type}] ${record.detail}`;
+                    return `(${record.time}) [${record.place}] [${record.type}] ${record.detail} (${record.reporter})`;
                 }).join('\n----------\n'); 
             }
         });
