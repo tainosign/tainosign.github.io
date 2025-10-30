@@ -636,16 +636,15 @@ callback: function(value, index, ticks) {
             
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
-                const timePart = row[0]; // HH:mm:ss
+                const timePart = row.timestamp.split(' ')[1];  // HH:mm:ss
                 
                 labels.push(timePart);
-                attendance.push(row[1]);
-                complaint.push(row[2]);
+                attendance.push(row.count || 0);
+                complaint.push(row.count || 0);
                 
-                if (row[2] > 0 && row[3]) {
-                    // complaintMapにはHH:mm:ssと詳細を格納
-                    complaintMap[timePart] = `${timePart} ${row[3]}`; 
-                }
+            if ((row.count || 0) > 0) {
+                complaintMap[timePart] = `(${timePart}) [${row.place}] [${row.type}] ${row.content} (${row.reporter})`;
+            }
             }
             return { labels, attendance, complaint, complaintMap };
         }
@@ -661,7 +660,8 @@ callback: function(value, index, ticks) {
 
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            const timestampString = row[0]; // HH:mm:ss
+            // const timestampString = row[0]; // HH:mm:ss
+            const timestampString = row.timestamp.split(' ')[1];
             
             // 日付情報がないため、今日のダミー日付を使ってDateオブジェクトを作成
             const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
@@ -671,9 +671,12 @@ callback: function(value, index, ticks) {
                 continue;
             }
             
-            const attendanceCount = row[1];
-            const complaintCount = row[2];
-            const complaintDetails = row[3];
+        const attendanceCount = row.count || 0;
+        const complaintCount = row.count || 0;
+
+            // const attendanceCount = row[1];
+            // const complaintCount = row[2];
+            // const complaintDetails = row[3];
             
             let hour = timestamp.getHours();
             let minute = timestamp.getMinutes();
