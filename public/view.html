@@ -621,12 +621,12 @@ callback: function(value, index, ticks) {
   return formatTimeLabel(label, currentUnit);
 }
                                     // 秒・分単位では5分ごとにラベルを表示するロジックを再現
-                                    if (currentUnit === 'second' || currentUnit === 'minute') {
-                                        const parts = fullTime.split(':'); 
-                                        const minutes = parseInt(parts[1]);
-                                        if (minutes % 5 !== 0) return '';
-                                    }
-                                    return formatTimeLabel(fullTime, currentUnit);
+                                    // if (currentUnit === 'second' || currentUnit === 'minute') {
+                                    //     const parts = fullTime.split(':'); 
+                                    //     const minutes = parseInt(parts[1]);
+                                    //     if (minutes % 5 !== 0) return '';
+                                    // }
+                                    // return formatTimeLabel(fullTime, currentUnit);
                                 }
                             }
                         }
