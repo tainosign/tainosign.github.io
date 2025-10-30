@@ -353,7 +353,7 @@ try {
 
         <!-- メニューへ戻るボタン (静的ページなのでリンクはなし) -->
         <div class="text-center mb-8">
-            <button onclick="window.history.back()" class="w-full md:w-96 bg-gray-500 text-white px-6 py-3 text-lg rounded-lg hover:bg-gray-600 transition duration-150 shadow-lg">前の画面へ戻る</button>
+            <button onclick="window.history.back()" class="w-full md:w-96 bg-gray-500 text-white px-6 py-3 text-lg rounded-lg hover:bg-gray-600 transition duration-150 shadow-lg">メニューへ戻る</button>
         </div>
 
     </div>
@@ -425,11 +425,6 @@ try {
         
         // 日付選択変更のイベントリスナー (populateDateSelector内でセットアップ)
     });
-    
-    // // --- Firebase認証完了後に実行される初期化関数 (import scriptからコールされる) ---
-  //  window.externalAPI.initializeViewAfterAuth = initializeView;
-   // window.externalAPI.onFailure = onFailure;
-
 
     function setupAutoRefresh() {
         if (autoRefreshTimer) {
@@ -485,24 +480,24 @@ try {
         setupAutoRefresh();
     }
 
-    async function drawChart(date) {
-        if (myChart) {
-            myChart.destroy();
-        }
+let isFetching = false;
 
-        const container = document.getElementById('chart-container');
-        // canvas要素を再生成し、ロード中メッセージを表示
-        container.innerHTML = `<canvas id="chart_div" class="loading"><p>データを取得中...</p></canvas>`;
+async function drawChart(date) {
+  if (isFetching) return;
+  isFetching = true;
 
-        try {
-            // Firebaseからタイムラインデータを取得
-            const chartData = await window.externalAPI.fetchDailyCountTimeline(date);
-            onDataReceived(chartData);
-
-        } catch (error) {
-            onFailure(error);
-        }
-    }
+  try {
+    if (myChart) myChart.destroy();
+    const container = document.getElementById('chart-container');
+    container.innerHTML = `<canvas id="chart_div" class="loading"><p>データを取得中...</p></canvas>`;
+    const chartData = await window.externalAPI.fetchDailyCountTimeline(date);
+    onDataReceived(chartData);
+  } catch (error) {
+    onFailure(error);
+  } finally {
+    isFetching = false;
+  }
+}
 
     function onDataReceived(chartData) {
         rawChartData = chartData; 
@@ -617,8 +612,14 @@ try {
                                 maxRotation: 0, 
                                 minRotation: 0,
                                 font: { size: 14 }, 
-                                callback: function(val, index) {
-                                    const fullTime = this.getLabelForValue(val);
+callback: function(value, index, ticks) {
+  const label = this.chart.data.labels[index];
+  if (!label) return '';
+  const parts = label.split(':');
+  const minutes = parseInt(parts[1] || 0);
+  if ((currentUnit === 'second' || currentUnit === 'minute') && minutes % 5 !== 0) return '';
+  return formatTimeLabel(label, currentUnit);
+}
                                     // 秒・分単位では5分ごとにラベルを表示するロジックを再現
                                     if (currentUnit === 'second' || currentUnit === 'minute') {
                                         const parts = fullTime.split(':'); 
