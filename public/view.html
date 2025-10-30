@@ -226,29 +226,20 @@ try {
                 second: '2-digit'
             });
 
-            const entryCount = row.type === "in" ? (row.count || 0) : 0;
-            const exitCount = row.type === "out" ? (row.count || 0) : 0;
-            currentCount += entryCount - exitCount;
-            currentCount = Math.max(0, currentCount);
+    const complaintDetails = row.content || null;
+    const complaintCount = complaintDetails ? 1 : 0;
 
-            // 報告内容
-            const vendorDetails = row.vendorDetails || '';
-            const visitorDetails = row.visitorDetails || '';
-            const otherDetails = row.otherDetails || '';
-            let complaintDetails = '';
-            if (vendorDetails) complaintDetails += `[出店者] ${vendorDetails}\n`;
-            if (visitorDetails) complaintDetails += `[来場者] ${visitorDetails}\n`;
-            if (otherDetails) complaintDetails += `[その他] ${otherDetails}\n`;
-            complaintDetails = complaintDetails.trim() || null;
-            const complaintCount = complaintDetails ? 1 : 0;
+    if (!window.currentCount) window.currentCount = 0;
+    if (row.type === 'in') window.currentCount += row.count || 0;
+    if (row.type === 'out') window.currentCount -= row.count || 0;
+    window.currentCount = Math.max(0, window.currentCount);
 
-            // グラフ用データ追加
-            chartData.push([
-                formattedTimestamp,
-                currentCount,
-                complaintCount,
-                complaintDetails
-            ]);
+    chartData.push([
+        formattedTimestamp,
+        window.currentCount,
+        complaintCount,
+        complaintDetails
+    ]);
         });
 
         console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
