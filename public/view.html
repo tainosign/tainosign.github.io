@@ -154,9 +154,6 @@ import {
 async function fetchRecordedDates() {
     console.log("Firestore: 記録された日付リストを取得中...");
     let currentCount = 0;
-    const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
-    const dates = new Set();
-
   try {
     const logRef = collection(db, getPublicCollectionPath("log"));
     const q = query(logRef, orderBy("timestamp", "desc"));
@@ -184,6 +181,8 @@ async function fetchRecordedDates() {
                     
 async function fetchDailyCountTimeline(dateStr) {
 console.log("渡された dateStr:", dateStr, typeof dateStr);
+        const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
+    const dates = new Set();
       try {
 
   // ✅ "2025/10/30" → Date("2025/10/30 00:00:00")
