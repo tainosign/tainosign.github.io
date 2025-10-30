@@ -636,8 +636,17 @@ callback: function(value, index, ticks) {
             
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
-                // const timePart = row.timestamp.split(' ')[1];  // HH:mm:ss
-                const timePart = row[0];
+
+                const tsString = row.timestamp
+                    ? (typeof row.timestamp === 'string' ? row.timestamp : row.timestamp.toDate?.()?.toISOString())
+                    : null;
+if (!tsString) {
+    console.warn('timestamp missing for row', row);
+    continue; // timestamp がなければこの行はスキップ
+}
+const timePart = tsString.split(' ')[1]; // HH:mm:ss を抽出
+                
+                // const timePart = row[0];
                 
                 labels.push(timePart);
                 attendance.push(row.count || 0);
