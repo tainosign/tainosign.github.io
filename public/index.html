@@ -221,7 +221,7 @@
             let day2TotalIn = 0;
 
             // 🔹過去◯分（可変）を設定
-            const lookbackMinutes = 30; // 30分間のローリングウィンドウ
+            const lookbackMinutes = 10; // 30分間のローリングウィンドウ
             const lookbackMs = lookbackMinutes * 60 * 1000;
             const sinceTime = new Date(now.getTime() - lookbackMs);
 
@@ -364,6 +364,7 @@
     </script>
 </body>
 </html>
+
 
 
 
