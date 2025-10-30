@@ -706,9 +706,9 @@ callback: function(value, index, ticks) {
                 aggregated[key].complaintDetails.push({
                     time: timestampString, // HH:mm:ss
                     detail: complaintDetails,
-                    place: row.place || '',
-                    type: row.type || '',
-                    reporter: row.reporter || ''
+                    place: row[4],
+                    type: row[5],
+                    reporter: row[6]
                 });
             }
         }
