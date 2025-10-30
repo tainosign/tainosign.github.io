@@ -181,7 +181,7 @@ async function fetchRecordedDates() {
         
 
                     
-async function fetchDailyCountTimeline(date) {
+async function fetchDailyCountTimeline(dateStr) {
 console.log("渡された dateStr:", dateStr, typeof dateStr);
 
   // ✅ "2025/10/30" → Date("2025/10/30 00:00:00")
@@ -211,7 +211,7 @@ console.log("渡された dateStr:", dateStr, typeof dateStr);
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            console.log(`Firestore: **${date}** のログデータは見つかりませんでした。`);
+            console.log(`Firestore: **${dateStr}** のログデータは見つかりませんでした。`);
             return chartData;
         }
 
