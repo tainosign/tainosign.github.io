@@ -152,9 +152,10 @@ import {
          */
 
 async function fetchRecordedDates() {
-  console.log("Firestore: 記録された日付リストを取得中...");
-
-  const dates = new Set();
+    console.log("Firestore: 記録された日付リストを取得中...");
+    let currentCount = 0;
+    const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
+    const dates = new Set();
 
   try {
     const logRef = collection(db, getPublicCollectionPath("log"));
