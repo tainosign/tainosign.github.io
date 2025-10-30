@@ -152,65 +152,69 @@ import {
          */
 
 async function fetchRecordedDates() {
-    console.log("Firestore: 記録された日付リストを取得中...");
+  console.log("Firestore: 記録された日付リストを取得中...");
 
-    const dates = new Set();
-    try {
-        // ✅ log コレクションを直接参照
-        const logRef = collection(db, getPublicCollectionPath("log"));
-        const q = query(logRef, orderBy("timestamp", "desc")); // ✅ timestamp を使用
+  const dates = new Set();
 
-        const querySnapshot = await getDocs(q);
+  try {
+    const logRef = collection(db, getPublicCollectionPath("log"));
+    const q = query(logRef, orderBy("timestamp", "desc"));
+    const querySnapshot = await getDocs(q);
 
-querySnapshot.forEach((doc) => {
-  const data = doc.data();
-  if (data.timestamp) {
-    const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-    ts.setHours(0, 0, 0, 0); // 同じ日の扱いに統一
-    dates.add(ts.getTime()); // 数値でSetに入れる
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.timestamp) {
+        const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+        const dateStr = ts.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }); // 例: 2025/10/30
+        dates.add(dateStr);
+      }
+    });
+
+    const uniqueDates = Array.from(dates).sort().reverse();
+    console.log("Firestore: 記録された日付", uniqueDates);
+    return uniqueDates; // ✅ 文字列で返す（UI用）
+  } catch (e) {
+    console.error("Firestore: 日付リストの取得に失敗しました", e);
+    throw new Error("日付リストの取得に失敗しました: " + e.message);
   }
-});
-
-const uniqueDates = Array.from(dates)
-  .sort((a, b) => b - a)
-  .map((t) => new Date(t)); // ✅ Dateオブジェクトの配列で返す
-
-console.log(`Firestore: 記録された日付 ${uniqueDates.length} 件`);
-return uniqueDates;
-
-    } catch (e) {
-        console.error("Firestore: 日付リストの取得に失敗しました", e);
-        throw new Error("日付リストの取得に失敗しました: " + e.message);
-    }
 }
         
 
                     
 async function fetchDailyCountTimeline(date) {
-    console.log(`Firestore: 日付 **${date}** のタイムラインデータを取得中...`);
-    console.log("📅 渡された date の内容:", date, typeof date);
+console.log("渡された dateStr:", dateStr, typeof dateStr);
 
-    let currentCount = 0;
-    const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
+  // ✅ "2025/10/30" → Date("2025/10/30 00:00:00")
+  let date;
+  if (typeof dateStr === "string") {
+    const [year, month, day] = dateStr.split("/").map((v) => parseInt(v, 10));
+    date = new Date(year, month - 1, day, 0, 0, 0);
+  } else {
+    date = dateStr;
+  }
+
+  // ✅ Firestore 用の1日範囲
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  console.log("startOfDay:", startOfDay.toLocaleString(), "endOfDay:", endOfDay.toLocaleString());
+
+  // ✅ Firestore クエリ（例）
+  const q = query(
+    collection(db, getPublicCollectionPath("timeline")),
+    where("timestamp", ">=", startOfDay),
+    where("timestamp", "<=", endOfDay)
+  );
     
-    try {
-        // 🔹 指定日の00:00〜23:59までを日本時間で取得
-        const start = new Date(`${date}T00:00:00+09:00`);
-        const end = new Date(`${date}T23:59:59+09:00`);
-
-        const q = query(
-            collection(db, LOG_COLLECTION_PATH),
-            where("timestamp", ">=", start),
-            where("timestamp", "<=", end),
-            orderBy("timestamp", "asc")
-        );
-
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
             console.log(`Firestore: **${date}** のログデータは見つかりませんでした。`);
             return chartData;
         }
+
 
         querySnapshot.forEach((doc) => {
             const row = doc.data();
