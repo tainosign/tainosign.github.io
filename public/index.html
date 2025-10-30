@@ -217,6 +217,7 @@
             const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
             
             let currentCount = 0;
+            let exitinCount = 0;
             let day1TotalIn = 0;
             let day2TotalIn = 0;
 
@@ -239,21 +240,54 @@
                 if (tsDateStr !== todayStr) return; 
 
                 // 当日データを集計
-                if (type === 'in' || type === 'exitin') {
-                    currentCount += count;
-                    if (eventDay === 'day1') day1TotalIn += count;
-                    else if (eventDay === 'day2') day2TotalIn += count;
+              //  if (type === 'in' || type === 'exitin') {
+                    
+               //     currentCount += count;
+                 //   if (eventDay === 'day1') day1TotalIn += count;
+                  //  else if (eventDay === 'day2') day2TotalIn += count;
 
                     // 🔹30分以内のデータをカウント (リアルタイム時間 'now' に依存)
-                    if (ts >= sinceTime) recentInCount += count;
-                } else if (type === 'out') {
-                    currentCount -= count;
-                }
+                 //   if (ts >= sinceTime) recentInCount += count;
+             //   } else if (type === 'out') {
+              //      currentCount -= count;
+              //  }
+
+                 if (type === 'in') {
+            currentCount += count;
+            if (eventDay === 'day1') day1TotalIn += count;
+            else if (eventDay === 'day2') day2TotalIn += count;
+            if (ts >= sinceTime) recentInCount += count;
+        } 
+        else if (type === 'exitin') {
+            currentCount += count;      // 通常入場と同様にカウント
+            exitinCount += count;       // 👈 内訳用カウンタを加算
+            if (eventDay === 'day1') day1TotalIn += count;
+            else if (eventDay === 'day2') day2TotalIn += count;
+            if (ts >= sinceTime) recentInCount += count;
+        } 
+        else if (type === 'out') {
+            currentCount -= count;
+                    }
+                
             });
 
             // 🔹現在場内人数
             currentCount = Math.max(0, currentCount);
             currentCountValueEl.textContent = currentCount.toLocaleString();
+
+
+// すでに出口情報がある場合はいったん削除
+let existingExitinEl = document.getElementById("exitin-count");
+if (existingExitinEl) existingExitinEl.remove();
+
+// 新しい要素を作成
+const exitinEl = document.createElement("span");
+exitinEl.id = "exitin-count";
+exitinEl.textContent = `（内、出口${exitinCount}）`;
+exitinEl.className = "ml-2 text-base text-gray-300"; // Tailwindで控えめに表示
+
+// 人数スパンの直後に追加
+currentCountValueEl.insertAdjacentElement("afterend", exitinEl);
 
             // 🔹各日合計 (onSnapshotで更新されるが、リアルタイム性が低いためここでも更新して統一性を保つ)
             day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
@@ -364,6 +398,7 @@
     </script>
 </body>
 </html>
+
 
 
 
