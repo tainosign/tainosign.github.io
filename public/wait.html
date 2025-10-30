@@ -245,8 +245,13 @@
                 const ts = log.timestamp?.toDate ? log.timestamp.toDate().getTime() : (typeof log.timestamp === 'number' ? log.timestamp : null);
 
                 // typeが「入場」であり、countが有効な数値であり、かつ過去30分以内であるログのみをカウント
-                if (ts !== null && ts >= windowStartMs && log.type === 'in' && typeof log.count === 'number' && log.count > 0) {
-                    recentInCount += log.count;
+                //if (ts !== null && ts >= windowStartMs && log.type === 'in' && typeof log.count === 'number' && log.count > 0) {
+                 //   recentInCount += log.count;
+                //}
+
+                if (ts !== null && ts >= windowStartMs &&(log.type === 'in' || log.type === 'exitin') && // 👈 exitinを追加
+    typeof log.count === 'number' && log.count > 0) {
+    recentInCount += log.count;
                 }
             }
 
