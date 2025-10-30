@@ -203,7 +203,7 @@ console.log("渡された dateStr:", dateStr, typeof dateStr);
 try {
   // ✅ Firestore クエリ（例）
   const q = query(
-    collection(db, getPublicCollectionPath("timeline")),
+    collection(db, getPublicCollectionPath("log")),
     where("timestamp", ">=", startOfDay),
     where("timestamp", "<=", endOfDay)
   );
