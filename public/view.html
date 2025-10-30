@@ -620,6 +620,7 @@ callback: function(value, index, ticks) {
   if ((currentUnit === 'second' || currentUnit === 'minute') && minutes % 5 !== 0) return '';
   return formatTimeLabel(label, currentUnit);
 }
+
                                     // 秒・分単位では5分ごとにラベルを表示するロジックを再現
                                     // if (currentUnit === 'second' || currentUnit === 'minute') {
                                     //     const parts = fullTime.split(':'); 
@@ -627,7 +628,7 @@ callback: function(value, index, ticks) {
                                     //     if (minutes % 5 !== 0) return '';
                                     // }
                                     // return formatTimeLabel(fullTime, currentUnit);
-                                }
+                                // }
                             }
                         }
                     }
