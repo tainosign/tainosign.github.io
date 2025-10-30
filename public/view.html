@@ -195,13 +195,11 @@ console.log("渡された dateStr:", dateStr, typeof dateStr);
   }
 
   // ✅ Firestore 用の1日範囲
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0));
+  const endOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999));
 
-  console.log("startOfDay:", startOfDay.toLocaleString(), "endOfDay:", endOfDay.toLocaleString());
-    
+  console.log("startOfDay (UTC):", startOfDay.toISOString(), "endOfDay (UTC):", endOfDay.toISOString());
+
 try {
   // ✅ Firestore クエリ（例）
   const q = query(
