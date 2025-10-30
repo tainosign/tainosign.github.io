@@ -515,8 +515,8 @@ async function drawChart(date) {
         const complaintMap = aggregated.complaintMap;
         const chartElement = document.getElementById('chart_div');
 
-// console.log("[DEBUG] complaintData:", complaintData);
-// console.log("[DEBUG] complaintMap:", complaintMap);
+ console.log("[DEBUG] complaintData:", complaintData);
+ console.log("[DEBUG] complaintMap:", complaintMap);
         
         if (!chartElement) {
             console.error(`[DOM ERROR] ID 'chart_div' の canvas 要素が見つかりません。`);
@@ -647,7 +647,7 @@ callback: function(value, index, ticks) {
                 
                 if (row[2] > 0 && row[3]) {
                     // complaintMapにはHH:mm:ssと詳細を格納
-                    complaintMap[timePart] = `${timePart} ${row[3]}`; 
+                    complaintMap[timePart] = `${record.time}) [${record.place}] [${record.type}] ${record.detail} (${record.reporter}`; 
                 }
             }
             return { labels, attendance, complaint, complaintMap };
