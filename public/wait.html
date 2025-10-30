@@ -135,8 +135,8 @@
         import { getFirestore, collection, query, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- 定数 ---
-        const PACE_WINDOW_MINUTES = 30; // ペース算出に使用する過去の時間枠（分）
-        const MIN_PEOPLE_FOR_PACE = 3;  // ペース計算に必要な最小人数
+        const PACE_WINDOW_MINUTES = 10; // ペース算出に使用する過去の時間枠（分）
+        const MIN_PEOPLE_FOR_PACE = 2;  // ペース計算に必要な最小人数
         const DEFAULT_WAIT_TIME = 0;    // データ不足時のデフォルト待ち時間 (分)
         const PEOPLE_PER_METER = 2.5;   // 行列の密度: 1メートルあたり2.5人
         
