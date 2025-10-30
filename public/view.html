@@ -736,29 +736,6 @@ callback: function(value, index, ticks) {
         return { labels, attendance, complaint, complaintMap };
     }
 
-        const labels = [];
-        const attendance = [];
-        const complaint = [];
-        const complaintMap = {};
-
-        // 集計キーでソートして最終データを作成
-        Object.keys(aggregated).sort().forEach(key => {
-            const item = aggregated[key];
-            labels.push(key);
-            attendance.push(item.lastAttendance);
-            complaint.push(item.complaintSum);
-            
-            if (item.complaintDetails.length > 0) {
-                // 集計単位の時刻 (HH:mm) に紐づく全てのトラブル詳細を結合
-                complaintMap[key] = item.complaintDetails.map(record => {
-                    return `(${record.time}) [${record.place}] [${record.type}] ${record.detail} (${record.reporter})`;
-                }).join('\n----------\n'); 
-            }
-        });
-        
-        return { labels, attendance, complaint, complaintMap };
-    }
-
     function getUnitLabel(unit) {
         return {
             'second': '1秒',
