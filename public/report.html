@@ -489,7 +489,7 @@
                 content: contentText,     // 報告内容（textarea）
                 place: placeText,         // 発生場所/対象（ラジオボタンの値）
                 reporter: formData.reporter.trim() || '匿名', // 報告者名（text input）
-                vendor_name: formData.place || '', // 出店者名 (select)
+                //vendor_name: formData.place || '', // 出店者名 (select)
 
                 // 認証済みのユーザーID
                 user_id: userId,
@@ -497,7 +497,7 @@
 
             // GASのロジックに近くなるように type（報告種別）を content に追加
             // 例: content: "[出店者] - 内容..." のように整形する
-            reportData.content = `[${formData.report_type}] ${reportData.content}`;
+            //reportData.content = `[${formData.report_type}] ${reportData.content}`;
 
 
             // データ追加処理
