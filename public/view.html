@@ -169,7 +169,7 @@ async function fetchRecordedDates() {
     });
 
     const uniqueDates = Array.from(dates).sort().reverse();
-    console.log("Firestore: 記録された日付", uniqueDates);
+    // console.log("Firestore: 記録された日付", uniqueDates);
     return uniqueDates; // ✅ 文字列で返す（UI用）
   } catch (e) {
     console.error("Firestore: 日付リストの取得に失敗しました", e);
@@ -180,7 +180,7 @@ async function fetchRecordedDates() {
 
                     
 async function fetchDailyCountTimeline(dateStr) {
-console.log("渡された dateStr:", dateStr, typeof dateStr);
+// console.log("渡された dateStr:", dateStr, typeof dateStr);
         const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
     const dates = new Set();
 let currentCount = 0;
@@ -198,7 +198,7 @@ let currentCount = 0;
   const startOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0));
   const endOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999));
 
-  console.log("startOfDay (UTC):", startOfDay.toISOString(), "endOfDay (UTC):", endOfDay.toISOString());
+  // console.log("startOfDay (UTC):", startOfDay.toISOString(), "endOfDay (UTC):", endOfDay.toISOString());
 
 try {
   // ✅ Firestore クエリ（例）
@@ -244,8 +244,8 @@ try {
         row.reporter || ''              // 6: reporter
     ]);
         });
-
-        console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
+console.log(`Firestore: 抽出されたデータ: ${chartData}`);
+        // console.log(`Firestore: 抽出されたデータ行数 (ヘッダー含む): ${chartData.length}`);
         return chartData;
 
     } catch (e) {
@@ -515,8 +515,8 @@ async function drawChart(date) {
         const complaintMap = aggregated.complaintMap;
         const chartElement = document.getElementById('chart_div');
 
-console.log("[DEBUG] complaintData:", complaintData);
-console.log("[DEBUG] complaintMap:", complaintMap);
+// console.log("[DEBUG] complaintData:", complaintData);
+// console.log("[DEBUG] complaintMap:", complaintMap);
         
         if (!chartElement) {
             console.error(`[DOM ERROR] ID 'chart_div' の canvas 要素が見つかりません。`);
