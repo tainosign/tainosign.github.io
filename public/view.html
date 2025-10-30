@@ -183,7 +183,7 @@ async function fetchDailyCountTimeline(dateStr) {
 console.log("渡された dateStr:", dateStr, typeof dateStr);
         const chartData = [['日時', '場内人数', '報告件数', '報告内容']];
     const dates = new Set();
-
+let currentCount = 0;
 
   // ✅ "2025/10/30" → Date("2025/10/30 00:00:00")
   let date;
