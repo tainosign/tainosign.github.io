@@ -153,7 +153,7 @@ import {
 
 async function fetchRecordedDates() {
     console.log("Firestore: 記録された日付リストを取得中...");
-    let currentCount = 0;
+    const dates = new Set();
   try {
     const logRef = collection(db, getPublicCollectionPath("log"));
     const q = query(logRef, orderBy("timestamp", "desc"));
