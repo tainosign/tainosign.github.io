@@ -248,54 +248,56 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     let currentCount = 0;
     let day1TotalIn = 0;
     let day2TotalIn = 0;
+    let exitinCount = 0; // 👈 追加: 出口から入場した人数
 
     const now = new Date();
     const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-
-    // 🔹過去◯分（可変）を設定
-    const lookbackMinutes = 10; // ←ここを変えれば可変
+    const lookbackMinutes = 10;
     const lookbackMs = lookbackMinutes * 60 * 1000;
     const sinceTime = new Date(now.getTime() - lookbackMs);
-
-    let recentInCount = 0; // 過去30分間の入場数
+    let recentInCount = 0;
 
     snapshot.forEach(doc => {
         const data = doc.data();
-        const type = data.type; // "in" or "out"
+        const type = data.type;
         const eventDay = data.event_day;
         const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
         const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
         if (!ts) return;
 
         const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-        if (tsDateStr !== todayStr) return; // 当日以外は無視
+        if (tsDateStr !== todayStr) return;
 
-        // 当日データを集計
-        if (type === 'in' || type === 'exitin') {
+        if (type === 'in') {
             currentCount += count;
             if (eventDay === 'day1') day1TotalIn += count;
             else if (eventDay === 'day2') day2TotalIn += count;
-
-            // 🔹30分以内のデータをカウント
             if (ts >= sinceTime) recentInCount += count;
-        } else if (type === 'out') {
+        } 
+        else if (type === 'exitin') {
+            currentCount += count;      // 通常入場と同様にカウント
+            exitinCount += count;       // 👈 内訳用カウンタを加算
+            if (eventDay === 'day1') day1TotalIn += count;
+            else if (eventDay === 'day2') day2TotalIn += count;
+            if (ts >= sinceTime) recentInCount += count;
+        } 
+        else if (type === 'out') {
             currentCount -= count;
         }
     });
 
-    // 🔹現在場内人数
     currentCount = Math.max(0, currentCount);
-    currentCountValueEl.textContent = currentCount.toLocaleString();
 
-    // 🔹各日合計
+    // 🔹表示更新（exitin内訳付き）
+    currentCountValueEl.innerHTML = `${currentCount.toLocaleString()} <span class="text-sm text-gray-200">(内、出口${exitinCount.toLocaleString()})</span>`;
+
     day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
     day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
 
-    // 🔹100人あたり待ち時間を算出
     let waitTimeText = '--';
     if (recentInCount > 0) {
-        const timePer100 = 3000 / recentInCount; // 分単位
-        waitTimeText = timePer100.toFixed(1); // 小数1桁
+        const timePer100 = 3000 / recentInCount;
+        waitTimeText = timePer100.toFixed(1);
     }
     waitTimeValueEl.textContent = waitTimeText;
 
@@ -407,6 +409,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
