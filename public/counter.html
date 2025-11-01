@@ -8,6 +8,11 @@
     
     <style>
         /* Base styles for the main layout from index.html */
+          /* ダブルタップズーム無効（iOS Safari / Android Chrome対応） */
+    html, body {
+        touch-action: manipulation;
+        -ms-touch-action: manipulation; /* 旧Edge対策 */
+        }
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: #f0f2f5; 
@@ -409,6 +414,7 @@ onSnapshot(getLogCollectionRef(db), (snapshot) => {
     </script>
 </body>
 </html>
+
 
 
 
