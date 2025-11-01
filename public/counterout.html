@@ -18,7 +18,18 @@
             flex-direction: column;
             min-height: 100vh;
         }
-        
+        /* すべてのボタンの文字列選択を禁止 */
+button, .counter-button {
+  -webkit-user-select: none; /* iOS Safari対応 */
+  -moz-user-select: none;    /* Firefox対応 */
+  -ms-user-select: none;     /* 旧Edge対応 */
+  user-select: none;         /* 標準対応 */
+}
+
+/* Android Chromeの長押しメニュー（コピーなど）を防止 */
+button {
+  -webkit-touch-callout: none;
+}
         .main-content { flex-grow: 1; padding: 0.5rem; overflow-y: auto; }
         .counter-button {
             transition: transform 0.1s ease-in-out, box-shadow 0.2s;
