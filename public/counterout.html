@@ -6,6 +6,11 @@
     <title>退場カウンター</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+          /* ダブルタップズーム無効（iOS Safari / Android Chrome対応） */
+    html, body {
+        touch-action: manipulation;
+        -ms-touch-action: manipulation; /* 旧Edge対策 */
+    }
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: #f0f2f5; 
@@ -13,6 +18,7 @@
             flex-direction: column;
             min-height: 100vh;
         }
+        
         .main-content { flex-grow: 1; padding: 0.5rem; overflow-y: auto; }
         .counter-button {
             transition: transform 0.1s ease-in-out, box-shadow 0.2s;
