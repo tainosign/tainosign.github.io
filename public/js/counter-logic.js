@@ -1,49 +1,60 @@
 // /js/counter-logic.js
-import { initializeFirebase } from "/js/firebase-config.js";
-import { getFirestore, collection, addDoc } 
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getFirestore, collection, addDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-/**
- * カウンターロジック初期化
- * @param {string} appId - Firebaseのアプリ識別ID
- */
+let db, auth, userId;
+let daySettings = { day1: null, day2: null };
+
 export async function setupCounter(appId) {
-  const { db } = await initializeFirebase();
+  const firebaseConfig = {
+    apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+    authDomain: "setapanmarketcounter.firebaseapp.com",
+    projectId: "setapanmarketcounter",
+  };
 
-  /**
-   * ボタン押下で人数を記録
-   * @param {string} type - in / out / localin / exitin など
-   * @param {number} count - 変動人数
-   */
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  await signInAnonymously(auth);
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      userId = user.uid;
+      setupRealtimeListener();
+    }
+  });
+
+  // ✅ logCountをグローバルに登録
   window.logCount = async (type, count) => {
-    const now = new Date();
-    const jstOffset = 9 * 60 * 60 * 1000; // UTC→JST
-    const jstDate = new Date(now.getTime() + jstOffset);
-    const event_day = jstDate.toISOString().split("T")[0]; // "2025-11-02"
-
-    const log = {
+    if (!db || !userId) return;
+    const logEntry = {
       type,
       count,
-      timestamp: jstDate,
-      event_day,
+      timestamp: serverTimestamp(),
+      user_id: userId,
+      event_day: "day1",
     };
-
-    try {
-      await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
-      flashButton(); // ✅ 視覚フィードバック
-    } catch (err) {
-      console.error("ログ記録エラー:", err);
-    }
+    await addDoc(collection(db, `/artifacts/${appId}/public/data/log`), logEntry);
   };
 }
 
-/**
- * ボタンを短時間点滅させるフィードバック
- */
-function flashButton() {
-  const active = document.activeElement;
-  if (active && active.classList.contains("counter-button")) {
-    active.classList.add("animate-pulse");
-    setTimeout(() => active.classList.remove("animate-pulse"), 300);
-  }
+// ✅ localinもカウント対象に追加
+function setupRealtimeListener() {
+  const logRef = collection(db, `/artifacts/setapanmarketcounter/public/data/log`);
+  onSnapshot(logRef, (snapshot) => {
+    let current = 0;
+    let localIn = 0;
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      if (["in", "exitin", "localin"].includes(d.type)) current += d.count;
+      if (d.type === "out") current -= d.count;
+      if (d.type === "localin") localIn += d.count;
+    });
+
+    const display = document.getElementById("current-count-value");
+    if (display) {
+      display.innerHTML = `${current} <span class="text-sm text-gray-200">(内、優先入場:${localIn})</span>`;
+    }
+  });
 }
