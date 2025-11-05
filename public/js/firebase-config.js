@@ -1,5 +1,5 @@
 // firebase-config.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -17,7 +17,8 @@ const firebaseConfig = {
 
 // === Firebase 初期化 & 認証 ===
 export async function initializeFirebase(customToken = null) {
-  const app = initializeApp(firebaseConfig);
+  // ✅ 既存アプリがあれば再利用
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
