@@ -5,6 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>地域優先入場カウンター</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/tailwind-config.js"></script>
+      <style>
+        /* ダブルタップズーム無効（iOS Safari / Android Chrome対応） */
+        html, body {
+          touch-action: manipulation;
+          -ms-touch-action: manipulation; /* 旧Edge対策 */
+        }
+        /* すべてのボタンの文字列選択を禁止 */
+        button, .counter-button {
+          -webkit-user-select: none; /* iOS Safari対応 */
+          -moz-user-select: none;    /* Firefox対応 */
+          -ms-user-select: none;     /* 旧Edge対応 */
+          user-select: none;         /* 標準対応 */
+        }
+        /* Android Chromeの長押しメニュー（コピーなど）を防止 */
+        button {
+          -webkit-touch-callout: none;
+        }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f0f2f5; 
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+      </style>
   <script type="module">
     import { loadHeader } from "/js/header-loader.js";
     import { initializeFirebase } from "/js/firebase-config.js";
@@ -45,11 +71,11 @@
         <button onclick="logCount('localin', 10)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+10</button>
       </div>
     </div>
-        <footer class="p-4 bg-gray-200 text-gray-700 border-t border-gray-300">
+  </main>
+    <footer class="p-4 bg-gray-200 text-gray-700 border-t border-gray-300">
         <a href="index.html" class="block w-full text-center bg-gray-400 hover:bg-gray-500 py-3 rounded-lg shadow-md text-white font-semibold text-lg">
             メニューへ戻る
         </a>
     </footer>
-  </main>
 </body>
 </html>
