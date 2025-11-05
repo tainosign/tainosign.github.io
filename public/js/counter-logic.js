@@ -1,55 +1,37 @@
 // /js/counter-logic.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { initializeFirebase } from "/js/firebase-config.js";
+import { collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let db, auth, userId;
-let daySettings = { day1: null, day2: null };
 
+// === カウンター初期化 ===
 export async function setupCounter(appId) {
-  const firebaseConfig = {
-    apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
-    authDomain: "setapanmarketcounter.firebaseapp.com",
-    projectId: "setapanmarketcounter",
-  };
+  const result = await initializeFirebase();
+  db = result.db;
+  auth = result.auth;
 
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+  // 認証後処理
+  userId = auth.currentUser?.uid || null;
 
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp(); // 既存のアプリを再利用
-}
-  
-  db = getFirestore(app);
-  auth = getAuth(app);
-  await signInAnonymously(auth);
+  // Firestoreリアルタイム監視
+  setupRealtimeListener(appId);
 
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      userId = user.uid;
-      setupRealtimeListener();
-    }
-  });
-
-  // ✅ logCountをグローバルに登録
+  // ✅ logCount関数を登録
   window.logCount = async (type, count) => {
-    if (!db || !userId) return;
+    if (!db) return;
     const logEntry = {
       type,
       count,
       timestamp: serverTimestamp(),
       user_id: userId,
-      event_day: "day1",
     };
     await addDoc(collection(db, `/artifacts/${appId}/public/data/log`), logEntry);
   };
 }
 
-// ✅ localinもカウント対象に追加
-function setupRealtimeListener() {
-  const logRef = collection(db, `/artifacts/setapanmarketcounter/public/data/log`);
+// === localin対応のリアルタイム更新 ===
+function setupRealtimeListener(appId) {
+  const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
   onSnapshot(logRef, (snapshot) => {
     let current = 0;
     let localIn = 0;
@@ -62,7 +44,7 @@ function setupRealtimeListener() {
 
     const display = document.getElementById("current-count-value");
     if (display) {
-      display.innerHTML = `${current} <span class="text-sm text-gray-200">(内、優先入場:${localIn})</span>`;
+      display.innerHTML = `${current} <span class="text-sm text-gray-200">(内、優先入場:${localIn} 出口0)</span>`;
     }
   });
 }
