@@ -35,33 +35,10 @@
       </style>
   <script type="module">
     import { loadHeader } from "/js/header-loader.js";
-    import { initializeFirebase } from "/js/firebase-config.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } 
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { setupCounter } from "/js/counter-logic.js";
 
-    // ヘッダー読み込み
     await loadHeader();
-
-    // Firebase初期化
-    const { db } = await initializeFirebase();
-    const appId = "setapanmarketcounter";
-
-    // ログ記録
-window.logCount = async (type, count) => {
-  const now = new Date();
-  const jstOffset = 9 * 60 * 60 * 1000; // 日本時間（UTC+9）
-  const jstDate = new Date(now.getTime() + jstOffset);
-  const event_day = jstDate.toISOString().split('T')[0]; // 例: "2025-11-02"
-
-  const log = {
-    type,
-    count,
-    timestamp: jstDate, // ✅ JST基準の日時
-    event_day,          // ✅ 日本時間の日付を保存
-  };
-
-  await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
-};
+    await setupCounter("setapanmarketcounter");
   </script>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
