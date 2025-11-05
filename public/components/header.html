@@ -1,0 +1,39 @@
+<!-- components/header.html -->
+<header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
+  <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
+
+    <!-- QRコード -->
+    <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
+      <img id="qr-code-image" 
+        src="qr.png"
+        alt="QRコード"
+        class="object-contain rounded w-full h-full"
+        onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像未設定</div>'">
+    </div>
+
+    <!-- 情報エリア -->
+    <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0 text-right">
+      <div id="current-count-display" class="text-lg md:text-5xl font-extrabold flex items-end justify-end flex-wrap gap-x-2">
+        場内人数:
+        <span id="current-count-value" class="ml-2 text-4xl text-yellow-400 tabular-nums">0</span>
+        <span class="text-sm md:text-base opacity-80">
+          （内、優先入場:<span id="localin-count" class="tabular-nums">0</span>
+          出口:<span id="exitin-count" class="tabular-nums">0</span>）
+        </span>
+      </div>
+
+      <div id="wait-time-display" class="w-full text-base md:text-lg font-light opacity-95">
+        100人当たり待ち時間: 
+        <span id="wait-time-value" class="font-bold tabular-nums">--</span>分
+      </div>
+
+      <div class="w-full text-base md:text-lg font-light opacity-90 pt-1 border-t border-cyan-400/50">
+        Day1 <span id="event-day1-date">--/--</span>：
+        <span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 
+        Day2 <span id="event-day2-date">--/--</span>：
+        <span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人 
+        計:<span class="font-bold ml-1 tabular-nums" id="total-visitors">0</span>人
+      </div>
+    </div>
+  </div>
+</header>
