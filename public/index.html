@@ -132,280 +132,120 @@
             
         </div>
     </div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { 
+  getFirestore, doc, onSnapshot, collection, query, where 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <!-- Firebase SDK (データ取得・更新ロジック) -->
-    <script type="module">
-        // Firebase SDKのインポート (バージョン11.6.1を使用)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// ==================== 基本設定 ====================
+const firebaseConfig = {
+  apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
+  authDomain: "setapanmarketcounter.firebaseapp.com",
+  projectId: "setapanmarketcounter",
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-        // ----------------------------------------------------
-        // 1. Firebase設定とグローバル変数
-        // ----------------------------------------------------
-        
-        let firebaseConfig = null;
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            try {
-                firebaseConfig = JSON.parse(__firebase_config);
-            } catch (e) {
-                console.error("Failed to parse __firebase_config:", e);
-            }
-        }
+let dayMap = {}; // { day1: "2025-11-01", day2: "2025-11-02" }
+let logData = [];
 
-        if (!firebaseConfig) {
-            console.warn("環境変数__firebase_configが見つかりません。フォールバック設定を使用します。");
-            firebaseConfig = {
-                apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
-                authDomain: "setapanmarketcounter.firebaseapp.com",
-                databaseURL: "https://setapanmarketcounter-default-rtdb.firebaseio.com",
-                projectId: "setapanmarketcounter",
-                storageBucket: "setapanmarketcounter.firebasestorage.app",
-                messagingSenderId: "546423839721",
-                appId: "1:546423839721:web:70d5c12129fe6cc1594978",
-                measurementId: "G-70KHJ0P1P1"
-            };
-        }
+const el = {
+  current: document.getElementById("current-count-value"),
+  wait: document.getElementById("wait-time-value"),
+  day1: document.getElementById("day1-visitors"),
+  day2: document.getElementById("day2-visitors"),
+  total: document.getElementById("total-visitors"),
+  date1: document.getElementById("event-day1-date"),
+  date2: document.getElementById("event-day2-date"),
+};
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; 
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// ==================== 日付フォーマット関数 ====================
+const toYMD = (ts) => {
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+};
+const toMD = (ts) => {
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
+};
 
-        let db, auth;
-        let userId = null;
-        let daySettings = { day1: null, day2: null }; 
-        // ログデータを保持する変数 (リアルタイム処理のために必要)
-        let logData = []; 
-        let calculationInterval = null; // リアルタイム計算用インターバル
+// ==================== 日付ドキュメント監視 ====================
+onSnapshot(doc(db, "artifacts/setapanmarketcounter/public/data/static/day"), (snap) => {
+  if (!snap.exists()) return console.warn("⚠️ dayドキュメントが存在しません");
 
-        // UI要素
-        const currentCountValueEl = document.getElementById('current-count-value');
-        const waitTimeValueEl = document.getElementById('wait-time-value');
-        const day1VisitorsEl = document.getElementById('day1-visitors');
-        const day2VisitorsEl = document.getElementById('day2-visitors');
-        const totalVisitorsEl = document.getElementById('total-visitors');
-        const eventDay1DateEl = document.getElementById('event-day1-date');
-        const eventDay2DateEl = document.getElementById('event-day2-date');
-        
-        // データベースパス定義ヘルパー
-        const getPublicCollectionPath = (collectionName) => 
-            // パス形式: /artifacts/setapanmarketcounter/public/data/{collectionName}
-            `/artifacts/${appId}/public/data/${collectionName}`;
+  const data = snap.data();
+  dayMap.day1 = toYMD(data.day1);
+  dayMap.day2 = toYMD(data.day2);
 
-        const getDayDocRef = (dbInstance) => 
-            doc(dbInstance, getPublicCollectionPath('static'), 'day'); // static/day ドキュメントを参照
+  el.date1.textContent = toMD(data.day1);
+  el.date2.textContent = toMD(data.day2);
 
-        const getLogCollectionRef = (dbInstance) => 
-            collection(dbInstance, getPublicCollectionPath('log')); // log コレクションを参照
+  setupLogListener(); // 日付取得後に実行
+});
 
-        // 日付フォーマットヘルパー (MM/DD形式)
-        const formatDate = (timestamp) => {
-            if (!timestamp) return '--/--';
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
-        };
+// ==================== ログ監視 ====================
+function setupLogListener() {
+  onSnapshot(collection(db, "artifacts/setapanmarketcounter/public/data/log"), (snap) => {
+    logData = snap.docs.map(d => d.data());
+    updateDisplay();
+  });
+}
 
-        // ----------------------------------------------------
-        // 2. リアルタイム時間が関係する計算関数 (New)
-        // ----------------------------------------------------
-        /**
-         * ログデータとリアルタイム時間 (new Date()) を基に、場内人数と待ち時間を更新します。
-         * onSnapshotでデータが更新された時、およびsetIntervalで時間が経過した時に呼び出されます。
-         */
-        function updateCalculations() {
-            // リアルタイムの現在日時を直接取得
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-            
-            let currentCount = 0;
-            let exitinCount = 0;
-            let day1TotalIn = 0;
-            let day2TotalIn = 0;
+// ==================== 表示更新 ====================
+function updateDisplay() {
+  if (!dayMap.day1 || !dayMap.day2) return;
 
-            // 🔹過去◯分（可変）を設定
-            const lookbackMinutes = 10; // 30分間のローリングウィンドウ
-            const lookbackMs = lookbackMinutes * 60 * 1000;
-            const sinceTime = new Date(now.getTime() - lookbackMs);
+  const now = new Date();
+  let counts = { in: 0, out: 0, exitin: 0 };
+  let totals = { [dayMap.day1]: 0, [dayMap.day2]: 0 };
+  let recentIn = 0;
 
-            let recentInCount = 0; // 過去30分間の入場数
+  const lookbackMs = 10 * 60 * 1000;
+  const since = new Date(now.getTime() - lookbackMs);
 
-            logData.forEach(data => {
-                const type = data.type; // "in" or "out"
-                const eventDay = data.event_day;
-                const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
-                const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
-                if (!ts) return;
+  logData.forEach(l => {
+    const ts = l.timestamp?.toDate ? l.timestamp.toDate() : null;
+    if (!ts) return;
+    const day = l.event_day; // "2025-11-01"など
+    if (!totals.hasOwnProperty(day)) return;
 
-                const tsDateStr = ts.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-                // 当日以外は無視 (Day1/Day2は静的日付設定に依存するため、ここではTodayでフィルタ)
-                if (tsDateStr !== todayStr) return; 
+    const c = l.count ?? 1;
+    if (l.type === "in" || l.type === "exitin") {
+      counts.in += c;
+      if (l.type === "exitin") counts.exitin += c;
+      totals[day] += c;
+      if (ts >= since) recentIn += c;
+    } else if (l.type === "out") {
+      counts.out += c;
+    }
+  });
 
-                // 当日データを集計
-              //  if (type === 'in' || type === 'exitin') {
-                    
-               //     currentCount += count;
-                 //   if (eventDay === 'day1') day1TotalIn += count;
-                  //  else if (eventDay === 'day2') day2TotalIn += count;
+  // 🧮 現在の場内人数
+  const current = Math.max(0, counts.in - counts.out);
+  el.current.textContent = current.toLocaleString();
 
-                    // 🔹30分以内のデータをカウント (リアルタイム時間 'now' に依存)
-                 //   if (ts >= sinceTime) recentInCount += count;
-             //   } else if (type === 'out') {
-              //      currentCount -= count;
-              //  }
+  // 👥 内訳（出口入場）
+  document.getElementById("exitin-count")?.remove();
+  const exitinEl = document.createElement("span");
+  exitinEl.id = "exitin-count";
+  exitinEl.textContent = `（内、出口${counts.exitin}）`;
+  exitinEl.className = "ml-2 text-base text-gray-300";
+  el.current.insertAdjacentElement("afterend", exitinEl);
 
-                 if (type === 'in') {
-            currentCount += count;
-            if (eventDay === 'day1') day1TotalIn += count;
-            else if (eventDay === 'day2') day2TotalIn += count;
-            if (ts >= sinceTime) recentInCount += count;
-        } 
-        else if (type === 'exitin') {
-            currentCount += count;      // 通常入場と同様にカウント
-            exitinCount += count;       // 👈 内訳用カウンタを加算
-            if (eventDay === 'day1') day1TotalIn += count;
-            else if (eventDay === 'day2') day2TotalIn += count;
-            if (ts >= sinceTime) recentInCount += count;
-        } 
-        else if (type === 'out') {
-            currentCount -= count;
-                    }
-                
-            });
+  // 📊 各日と合計
+  el.day1.textContent = totals[dayMap.day1].toLocaleString();
+  el.day2.textContent = totals[dayMap.day2].toLocaleString();
+  el.total.textContent = (totals[dayMap.day1] + totals[dayMap.day2]).toLocaleString();
 
-            // 🔹現在場内人数
-            currentCount = Math.max(0, currentCount);
-            currentCountValueEl.textContent = currentCount.toLocaleString();
+  // ⏱ 待ち時間
+  el.wait.textContent = recentIn > 0 ? ((10 / recentIn) * 100).toFixed(1) : "--";
+}
 
-
-// すでに出口情報がある場合はいったん削除
-let existingExitinEl = document.getElementById("exitin-count");
-if (existingExitinEl) existingExitinEl.remove();
-
-// 新しい要素を作成
-const exitinEl = document.createElement("span");
-exitinEl.id = "exitin-count";
-exitinEl.textContent = `（内、出口${exitinCount}）`;
-exitinEl.className = "ml-2 text-base text-gray-300"; // Tailwindで控えめに表示
-
-// 人数スパンの直後に追加
-currentCountValueEl.insertAdjacentElement("afterend", exitinEl);
-
-            // 🔹各日合計 (onSnapshotで更新されるが、リアルタイム性が低いためここでも更新して統一性を保つ)
-            day1VisitorsEl.textContent = day1TotalIn.toLocaleString();
-            day2VisitorsEl.textContent = day2TotalIn.toLocaleString();
-            totalVisitorsEl.textContent = (day1TotalIn + day2TotalIn).toLocaleString();
-
-            // 🔹100人あたり待ち時間を算出
-            let waitTimeText = '--';
-            if (recentInCount > 0) {
-                // 100人あたりの待ち時間 (分) = (30分 / 過去30分の入場者数) * 100
-                const timePer100 = (lookbackMinutes / recentInCount) * 100;
-                waitTimeText = timePer100.toFixed(1); // 小数1桁
-            }
-            waitTimeValueEl.textContent = waitTimeText;
-
-            // デバッグログ: 計算に使われたリアルタイム時間
-            // console.log(`[Calc] Current Time: ${now.toLocaleTimeString('ja-JP')}, Recent In: ${recentInCount}, Wait Time: ${waitTimeText}分`);
-        }
-
-        // ----------------------------------------------------
-        // 3. リアルタイムデータリスナー
-        // ----------------------------------------------------
-        function setupRealtimeListener() {
-            if (!db) {
-                console.error("Firestoreインスタンスが利用できません。");
-                return;
-            }
-
-            // --- A. 日付設定の監視 (static/day) ---
-            onSnapshot(getDayDocRef(db), (docSnap) => {
-                if (docSnap.exists()) {
-                    daySettings = docSnap.data();
-                    // day1, day2の日付を表示
-                    eventDay1DateEl.textContent = formatDate(daySettings.day1);
-                    eventDay2DateEl.textContent = formatDate(daySettings.day2);
-                } else {
-                    console.warn("日付設定ドキュメントが見つかりません。");
-                }
-            }, (error) => {
-                console.error("日付設定の購読エラー:", error);
-            });
-
-            // --- B. ログデータの監視と集計 (logコレクション) ---
-            onSnapshot(getLogCollectionRef(db), (snapshot) => {
-                // ログデータをキャッシュする
-                logData = snapshot.docs.map(doc => doc.data());
-                
-                // データが変更されたら即座に計算を実行
-                updateCalculations(); 
-                
-            }, (error) => {
-                console.error(`ログデータ監視エラー: ${error.message}`);
-                currentCountValueEl.textContent = 'データエラー';
-                waitTimeValueEl.textContent = '--';
-            });
-            
-            // --- C. リアルタイム時間による計算の更新 (New) ---
-            // ログデータ自体に変化がなくても、30分間のローリングウィンドウを動かすために5秒ごとに再計算
-            if (calculationInterval) clearInterval(calculationInterval);
-            calculationInterval = setInterval(updateCalculations, 30000); 
-            console.log("リアルタイム計算インターバルを開始しました (30秒ごと)。");
-        }
-
-        // ----------------------------------------------------
-        // 4. 初期化処理
-        // ----------------------------------------------------
-        async function initializeAppAndAuth() {
-            // 現在日時の表示・更新ロジックは削除されました
-            
-            if (!firebaseConfig) {
-                currentCountValueEl.textContent = '致命的エラー';
-                console.error("致命的エラー: Firebase設定がロードできませんでした。");
-                return;
-            }
-
-            setLogLevel('Debug');
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // 認証ロジック
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                // 認証後、リアルタイムリスナーを開始
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        setupRealtimeListener();
-                    } else {
-                        console.log("匿名認証に失敗しました。");
-                        currentCountValueEl.textContent = '認証失敗';
-                    }
-                });
-                
-            } catch (e) {
-                console.error(`Firebase初期化または認証エラー: ${e.message}`);
-                currentCountValueEl.textContent = '初期化失敗';
-            }
-        }
-
-        // アプリケーションの開始
-        window.onload = initializeAppAndAuth;
-    </script>
+// ==================== 匿名認証 ====================
+signInAnonymously(auth).then(() => console.log("✅ 匿名認証完了"));
+</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
