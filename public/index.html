@@ -95,6 +95,12 @@
     <!-- メインメニューコンテナ -->
     <div class="main-content flex flex-col justify-start items-center">
         <div class="w-full max-w-xl flex flex-col gap-4 py-6">
+            <!-- 🟠 0. 地域優先入場カウンター (ファイル名: counter.html) -->
+            <a href="counterlocal.html" 
+                id="counter-local-link" 
+                class="menu-link bg-green-in hover:bg-orange-500 text-white p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24">
+                🟠 地域優先入場カウンター
+            </a>
             
             <!-- 🟢 1. 入場カウンター (ファイル名: counter.html) -->
             <a href="counter.html" 
@@ -120,7 +126,7 @@
             <!-- 🕒 5. 待ち時間計算 (ファイル名: wait.html) -->
             <a href="wait.html" 
                 id="calculator-link" 
-                class="menu-link bg-orange-calc hover:bg-orange-700 text-white p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24">
+                class="menu-link bg-orange-calc hover:bg-slate-300 text-black p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24">
                 🕒 待ち時間計算
             </a>
                         <!-- 📈 4. 場内人数グラフビュー (ファイル名: view.html)
@@ -249,3 +255,4 @@ signInAnonymously(auth).then(() => console.log("✅ 匿名認証完了"));
 </script>
 </body>
 </html>
+
