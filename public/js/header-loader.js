@@ -4,11 +4,11 @@ import { getFirestore, doc, onSnapshot, collection }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export async function loadHeader(appId = "setapanmarketcounter") {
-  // ヘッダーHTMLの読み込み
+  // ヘッダーHTML読み込み
   const headerHTML = await fetch("/components/header.html").then(res => res.text());
   document.body.insertAdjacentHTML("afterbegin", headerHTML);
 
-  // Firebase 初期化
+  // Firebase初期化
   const { db } = await initializeFirebase();
 
   // 要素参照
@@ -33,7 +33,14 @@ export async function loadHeader(appId = "setapanmarketcounter") {
     return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
   };
 
+  const getTodayYMD = () => {
+    const d = new Date();
+    const jst = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    return jst.toISOString().split("T")[0];
+  };
+
   let dayMap = {};
+  let todayYMD = getTodayYMD();
 
   // === イベント日取得 ===
   onSnapshot(doc(db, `artifacts/${appId}/public/data/static/day`), (snap) => {
@@ -45,33 +52,45 @@ export async function loadHeader(appId = "setapanmarketcounter") {
     el.date2.textContent = toMD(data.day2);
   });
 
-  // === カウント情報の監視 ===
+  // === カウント情報監視 ===
   onSnapshot(collection(db, `artifacts/${appId}/public/data/log`), (snapshot) => {
-    let totalIn = 0, totalOut = 0, totalLocal = 0, totalExit = 0;
+    let todayIn = 0, todayOut = 0, todayLocal = 0, todayExit = 0;
     let day1Count = 0, day2Count = 0;
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const count = Number(data.count) || 0;
       const type = data.type;
-      const day = data.event_day;
+      const eventDay = data.event_day;
+      const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+      const logDate = timestamp.toISOString().split("T")[0];
 
-      if (type === "in") totalIn += count;
-      if (type === "out") totalOut += count;
-      if (type === "localin") totalLocal += count;
-      if (type === "exitin") totalExit += count;
+      // === 今日のリアルタイムカウント ===
+      if (logDate === todayYMD) {
+        if (type === "in") todayIn += count;
+        if (type === "out") todayOut += count;
+        if (type === "localin") todayLocal += count;
+        if (type === "exitin") todayExit += count;
+      }
 
-      if (day === dayMap.day1) day1Count += count;
-      if (day === dayMap.day2) day2Count += count;
+      // === イベント指定日のカウント ===
+      if (eventDay === "day1") day1Count += count;
+      if (eventDay === "day2") day2Count += count;
     });
 
-    const currentInside = totalIn + totalLocal + totalExit - totalOut;
-
+    // 現在場内人数
+    const currentInside = todayIn + todayLocal + todayExit - todayOut;
     el.current.textContent = currentInside;
-    el.localin.textContent = totalLocal;
-    el.exitin.textContent = totalExit;
+    el.localin.textContent = todayLocal;
+    el.exitin.textContent = todayExit;
+
+    // day1, day2, total 表示
     el.day1.textContent = day1Count;
     el.day2.textContent = day2Count;
     el.total.textContent = day1Count + day2Count;
+
+    // 100人あたり待ち時間（例: 仮定値）
+    const waitPer100 = (currentInside / 100 * 5).toFixed(1);
+    el.wait.textContent = isNaN(waitPer100) ? "--" : waitPer100;
   });
 }
