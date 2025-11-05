@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>優先入場カウンター</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .main-content { overflow-y: auto; flex-grow: 1; padding: 1rem; }
+    .counter-button {
+      transition: all 0.1s ease-in-out;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+    .counter-button:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'green-in': '#00a040',
+            'red-out': '#e53935',
+            'yellow-report': '#ffc107',
+            'cyan-view': '#17a2b8',
+            'orange-calc': '#ff9800',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- ✅ index.htmlと同一のヘッダー -->
+  <header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
+    <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
+      
+      <!-- 1. QRコードエリア -->
+      <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
+        <img id="qr-code-image" 
+          src="qr.png" 
+          alt="QRコード画像をここに配置" 
+          class="object-contain rounded w-full h-full"
+          onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
+      </div>
+
+      <!-- 2. 情報エリア -->
+      <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0 text-right">
+        <div id="current-count-display" class="text-lg md:text-5xl font-extrabold flex items-end justify-end">
+          場内人数: 
+          <span id="current-count-value" class="ml-2 text-4xl text-yellow-400 tabular-nums">0</span>
+        </div>
+        <div id="wait-time-display" class="w-full text-base md:text-lg font-light opacity-95">
+          100人当たり待ち時間: 
+          <span id="wait-time-value" class="font-bold tabular-nums">--</span>分
+        </div>
+        <div class="w-full text-base md:text-lg font-light opacity-90 pt-1 border-t border-cyan-400/50">
+          Day1 <span id="event-day1-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 
+          Day2 <span id="event-day2-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人 
+          計:<span class="font-bold ml-1 tabular-nums" id="total-visitors">0</span>人
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ✅ カウンター操作部分 -->
+  <div class="main-content flex flex-col justify-start items-center">
+    <div class="w-full max-w-xl flex flex-col gap-4 py-6">
+      <button onclick="logCount('localin', 1)" class="counter-button w-full bg-orange-500 hover:bg-orange-600 text-white rounded-2xl p-8 text-6xl font-bold">+1</button>
+      <div class="flex space-x-4">
+        <button onclick="logCount('localin', 5)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+5</button>
+        <button onclick="logCount('localin', 10)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+10</button>
+      </div>
+      <a href="index.html" class="bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-lg text-xl font-bold mt-6 text-center">メニューへ戻る</a>
+    </div>
+  </div>
+
+  <!-- ✅ Firebase ロジック -->
+  <script type="module">
+    import { initializeFirebase } from "/js/firebase-config.js";
+    import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } 
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const { db } = await initializeFirebase();
+    const appId = "setapanmarketcounter";
+    let dayMap = {};
+
+    const el = {
+      current: document.getElementById("current-count-value"),
+      wait: document.getElementById("wait-time-value"),
+      day1: document.getElementById("day1-visitors"),
+      day2: document.getElementById("day2-visitors"),
+      total: document.getElementById("total-visitors"),
+      date1: document.getElementById("event-day1-date"),
+      date2: document.getElementById("event-day2-date"),
+    };
+
+    // === 日付を YYYY-MM-DD に変換 ===
+    const toYMD = (ts) => {
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toISOString().split("T")[0];
+    };
+    const toMD = (ts) => {
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
+    };
+
+    // === イベント日取得 ===
+    onSnapshot(doc(db, `artifacts/${appId}/public/data/static/day`), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      dayMap.day1 = toYMD(data.day1);
+      dayMap.day2 = toYMD(data.day2);
+      el.date1.textContent = toMD(data.day1);
+      el.date2.textContent = toMD(data.day2);
+    });
+
+    // === カウント記録 ===
+    window.logCount = async (type, count) => {
+      const now = new Date();
+      const today = now.toISOString().split("T")[0];
+      const event_day =
+        today === dayMap.day1 ? dayMap.day1 :
+        today === dayMap.day2 ? dayMap.day2 :
+        today; // 予備
+
+      const log = {
+        type,
+        count,
+        event_day,
+        timestamp: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
+      console.log(`✅ 記録: ${type} x${count} (${event_day})`);
+    };
+  </script>
+
+</body>
+</html>
