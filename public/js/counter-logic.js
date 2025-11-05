@@ -13,7 +13,15 @@ export async function setupCounter(appId) {
     projectId: "setapanmarketcounter",
   };
 
-  const app = initializeApp(firebaseConfig);
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+
+let app;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp(); // 既存のアプリを再利用
+}
+  
   db = getFirestore(app);
   auth = getAuth(app);
   await signInAnonymously(auth);
