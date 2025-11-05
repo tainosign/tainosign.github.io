@@ -1,17 +1,16 @@
-// js/header-loader.js
 import { initializeFirebase } from "/js/firebase-config.js";
 import { getFirestore, doc, onSnapshot, collection } 
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export async function loadHeader(appId = "setapanmarketcounter") {
-  // ヘッダーHTML読み込み
+  // === ヘッダーHTML読み込み ===
   const headerHTML = await fetch("/components/header.html").then(res => res.text());
   document.body.insertAdjacentHTML("afterbegin", headerHTML);
 
-  // Firebase初期化
+  // === Firebase初期化 ===
   const { db } = await initializeFirebase();
 
-  // 要素参照
+  // === 要素参照 ===
   const el = {
     current: document.getElementById("current-count-value"),
     localin: document.getElementById("localin-count"),
@@ -24,17 +23,22 @@ export async function loadHeader(appId = "setapanmarketcounter") {
     date2: document.getElementById("event-day2-date"),
   };
 
-  const toYMD = (ts) => {
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toISOString().split("T")[0];
+  // === JST変換用関数 ===
+  const toJSTDate = (ts) => {
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    const jst = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    return jst;
   };
+
+  const toYMD = (ts) => toJSTDate(ts).toISOString().split("T")[0];
   const toMD = (ts) => {
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
+    const d = toJSTDate(ts);
+    return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
   };
+
   const getTodayYMD = () => {
-    const d = new Date();
-    const jst = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    const now = new Date();
+    const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
     return jst.toISOString().split("T")[0];
   };
 
@@ -47,11 +51,11 @@ export async function loadHeader(appId = "setapanmarketcounter") {
     const data = snap.data();
     dayMap.day1 = toYMD(data.day1);
     dayMap.day2 = toYMD(data.day2);
-    el.date1.textContent = toMD(data.day1);
-    el.date2.textContent = toMD(data.day2);
+    el.date1.textContent = `[${toMD(data.day1)}]`;
+    el.date2.textContent = `[${toMD(data.day2)}]`;
   });
 
-  // === カウント情報監視 ===
+  // === カウント監視 ===
   onSnapshot(collection(db, `artifacts/${appId}/public/data/log`), (snapshot) => {
     let todayIn = 0, todayOut = 0, todayLocal = 0, todayExit = 0;
     let day1Count = 0, day2Count = 0;
@@ -61,9 +65,10 @@ export async function loadHeader(appId = "setapanmarketcounter") {
       const count = Number(data.count) || 0;
       const type = data.type;
       const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-      const logDate = timestamp.toISOString().split("T")[0];
+      const jst = new Date(timestamp.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+      const logDate = jst.toISOString().split("T")[0];
 
-      // === 今日（リアルタイム）のカウント ===
+      // === 今日のリアルタイム ===
       if (logDate === todayYMD) {
         if (type === "in") todayIn += count;
         if (type === "out") todayOut += count;
@@ -71,27 +76,21 @@ export async function loadHeader(appId = "setapanmarketcounter") {
         if (type === "exitin") todayExit += count;
       }
 
-      // === day1/day2のカウント（イベント指定日基準） ===
-      if (logDate === dayMap.day1 && ["in", "localin", "exitin"].includes(type)) {
-        day1Count += count;
-      }
-      if (logDate === dayMap.day2 && ["in", "localin", "exitin"].includes(type)) {
-        day2Count += count;
-      }
+      // === 各日カウント ===
+      if (logDate === dayMap.day1 && ["in","localin","exitin"].includes(type)) day1Count += count;
+      if (logDate === dayMap.day2 && ["in","localin","exitin"].includes(type)) day2Count += count;
     });
 
-    // === 現在場内人数 ===
+    // === 表示 ===
     const currentInside = todayIn + todayLocal + todayExit - todayOut;
     el.current.textContent = currentInside;
     el.localin.textContent = todayLocal;
     el.exitin.textContent = todayExit;
+    el.day1.textContent = `：${day1Count}人`;
+    el.day2.textContent = `：${day2Count}人`;
+    el.total.textContent = `：${day1Count + day2Count}人`;
 
-    // === 日別集計 ===
-    el.day1.textContent = day1Count;
-    el.day2.textContent = day2Count;
-    el.total.textContent = day1Count + day2Count;
-
-    // === 100人あたり待ち時間（仮計算） ===
+    // === 待ち時間例 ===
     const waitPer100 = (currentInside / 100 * 5).toFixed(1);
     el.wait.textContent = isNaN(waitPer100) ? "--" : waitPer100;
   });
