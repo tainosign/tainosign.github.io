@@ -7,137 +7,83 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/js/tailwind-config.js"></script>
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f0f2f5;
+    /* ダブルタップズーム無効（iOS Safari / Android Chrome対応） */
+    html, body {
+      touch-action: manipulation;
+      -ms-touch-action: manipulation;
+    }
+    /* 文字列選択防止 */
+    button, .counter-button {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    /* 長押しメニュー無効化 */
+    button {
+      -webkit-touch-callout: none;
+    }
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background-color: #f0f2f5; 
       display: flex;
       flex-direction: column;
       min-height: 100vh;
     }
-    .main-content { overflow-y: auto; flex-grow: 1; padding: 1rem; }
-    .counter-button {
-      transition: all 0.1s ease-in-out;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    }
-    .counter-button:active {
-      transform: scale(0.98);
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    }
+    .large-counter-button { height: 32vh; min-height: 200px; }
+    .small-counter-button { height: 20vh; min-height: 120px; }
   </style>
-</head>
-<body>
 
-  <!-- ✅ index.htmlと同一のヘッダー -->
-  <header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
-    <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
-      
-      <!-- 1. QRコードエリア -->
-      <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
-        <img id="qr-code-image" 
-          src="qr.png" 
-          alt="QRコード画像をここに配置" 
-          class="object-contain rounded w-full h-full"
-          onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
-      </div>
-
-      <!-- 2. 情報エリア -->
-      <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0 text-right">
-        <div id="current-count-display" class="text-lg md:text-5xl font-extrabold flex items-end justify-end">
-          場内人数: 
-          <span id="current-count-value" class="ml-2 text-4xl text-yellow-400 tabular-nums">0</span>
-        </div>
-        <div id="wait-time-display" class="w-full text-base md:text-lg font-light opacity-95">
-          100人当たり待ち時間: 
-          <span id="wait-time-value" class="font-bold tabular-nums">--</span>分
-        </div>
-        <div class="w-full text-base md:text-lg font-light opacity-90 pt-1 border-t border-cyan-400/50">
-          Day1 <span id="event-day1-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 
-          Day2 <span id="event-day2-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人 
-          計:<span class="font-bold ml-1 tabular-nums" id="total-visitors">0</span>人
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- ✅ カウンター操作部分 -->
-  <div class="main-content flex flex-col justify-start items-center">
-    <div class="w-full max-w-xl flex flex-col gap-4 py-6">
-      <button onclick="logCount('in', 1)" class="counter-button w-full bg-green-in text-white rounded-2xl p-8 text-6xl font-bold">+1</button>
-      <div class="flex space-x-4">
-        <button onclick="logCount('in', 5)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+5</button>
-        <button onclick="logCount('in', 10)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+10</button>
-      </div>
-    </div>
-  </div>
-
-      <footer class="p-4 bg-gray-200 text-gray-700 border-t border-gray-300">
-        <a href="index.html" class="block w-full text-center bg-gray-400 hover:bg-gray-500 py-3 rounded-lg shadow-md text-white font-semibold text-lg">
-            メニューへ戻る
-        </a>
-    </footer>
-
-  <!-- ✅ Firebase ロジック -->
   <script type="module">
+    import { loadHeader } from "/js/header-loader.js";
     import { initializeFirebase } from "/js/firebase-config.js";
-    import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } 
+    import { getFirestore, collection, addDoc } 
       from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    // ✅ ヘッダー読み込み
+    await loadHeader();
+
+    // ✅ Firebase初期化
     const { db } = await initializeFirebase();
     const appId = "setapanmarketcounter";
-    let dayMap = {};
 
-    const el = {
-      current: document.getElementById("current-count-value"),
-      wait: document.getElementById("wait-time-value"),
-      day1: document.getElementById("day1-visitors"),
-      day2: document.getElementById("day2-visitors"),
-      total: document.getElementById("total-visitors"),
-      date1: document.getElementById("event-day1-date"),
-      date2: document.getElementById("event-day2-date"),
-    };
-
-    // === 日付を YYYY-MM-DD に変換 ===
-    const toYMD = (ts) => {
-      const d = ts.toDate ? ts.toDate() : new Date(ts);
-      return d.toISOString().split("T")[0];
-    };
-    const toMD = (ts) => {
-      const d = ts.toDate ? ts.toDate() : new Date(ts);
-      return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
-    };
-
-    // === イベント日取得 ===
-    onSnapshot(doc(db, `artifacts/${appId}/public/data/static/day`), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      dayMap.day1 = toYMD(data.day1);
-      dayMap.day2 = toYMD(data.day2);
-      el.date1.textContent = toMD(data.day1);
-      el.date2.textContent = toMD(data.day2);
-    });
-
-    // === カウント記録 ===
+    // ✅ ログ記録関数
     window.logCount = async (type, count) => {
       const now = new Date();
-      const today = now.toISOString().split("T")[0];
-      const event_day =
-        today === dayMap.day1 ? dayMap.day1 :
-        today === dayMap.day2 ? dayMap.day2 :
-        today; // 予備
+      const jstOffset = 9 * 60 * 60 * 1000; // 日本時間（UTC+9）
+      const jstDate = new Date(now.getTime() + jstOffset);
+      const event_day = jstDate.toISOString().split('T')[0]; // 例: "2025-11-02"
 
       const log = {
         type,
         count,
-        event_day,
-        timestamp: serverTimestamp(),
+        timestamp: jstDate, // JST基準の日時
+        event_day,          // JST基準の日付
       };
 
       await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
-      console.log(`✅ 記録: ${type} x${count} (${event_day})`);
     };
   </script>
+</head>
 
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- ✅ ヘッダーは loadHeader() で挿入 -->
+
+  <main class="flex-grow flex flex-col justify-start items-center">
+    <div class="w-full max-w-xl flex flex-col gap-2 py-2">
+      <button onclick="logCount('in', 1)" class="counter-button large-counter-button w-full bg-green-in hover:bg-green-700 text-white rounded-2xl p-8 text-6xl font-bold">+1</button>
+      <div class="flex space-x-4">
+        <button onclick="logCount('in', 5)" class="counter-button small-counter-button flex-1 bg-gray-500 text-white rounded-2xl hover:bg-gray-600 p-6 flex items-center justify-center font-bold text-6xl">+5</button>
+        <button onclick="logCount('in', 10)" class="counter-button small-counter-button flex-1 bg-gray-500 text-white rounded-2xl hover:bg-gray-600 p-6 flex items-center justify-center font-bold text-6xl">+10</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="p-4 bg-gray-200 text-gray-700 border-t border-gray-300">
+    <a href="index.html" class="block w-full text-center bg-gray-400 hover:bg-gray-500 py-3 rounded-lg shadow-md text-white font-semibold text-lg">
+      メニューへ戻る
+    </a>
+  </footer>
 </body>
 </html>
-
-
