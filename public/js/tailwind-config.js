@@ -8,6 +8,7 @@ tailwind.config = {
         'yellow-report': '#ffc107',
         'cyan-view': '#17a2b8',
         'orange-calc': '#ff9800',
+        'blue-time':'#00aff0',        
       }
     }
   }
