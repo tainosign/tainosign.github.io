@@ -46,18 +46,15 @@
     const { db } = await initializeFirebase();
     const appId = "setapanmarketcounter";
 
+    // ログ記録
     window.logCount = async (type, count) => {
-      const now = new Date();
-      const today = now.toISOString().split("T")[0];
-
       const log = {
         type,
         count,
-        event_day: today,
-        timestamp: serverTimestamp(),
+        timestamp: serverTimestamp(), // ✅ event_day削除
       };
       await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
-      console.log(`✅ 記録: ${type} x${count}`);
+      // console.log(`✅ 記録: ${type} x${count}`);
     };
   </script>
 </head>
