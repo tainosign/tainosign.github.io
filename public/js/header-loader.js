@@ -56,8 +56,8 @@ const getTodayYMD = () => {
     const data = snap.data();
     dayMap.day1 = toYMD_JST(data.day1);
     dayMap.day2 = toYMD_JST(data.day2);
-    el.date1.textContent = `[${toMD(data.day1)}]`;
-    el.date2.textContent = `[${toMD(data.day2)}]`;
+    el.date1.textContent = `[${toMD_JST(data.day1)}]`;
+    el.date2.textContent = `[${toMD_JST(data.day2)}]`;
   });
 
   // === カウント監視 ===
