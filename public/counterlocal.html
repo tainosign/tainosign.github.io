@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地域優先入場カウンター</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import { loadHeader } from "/js/header-loader.js";
+    import { initializeFirebase } from "/js/firebase-config.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } 
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ヘッダー読み込み
+    await loadHeader();
+
+    // Firebase初期化
+    const { db } = await initializeFirebase();
+    const appId = "setapanmarketcounter";
+
+    window.logCount = async (type, count) => {
+      const now = new Date();
+      const today = now.toISOString().split("T")[0];
+
+      const log = {
+        type,
+        count,
+        event_day: today,
+        timestamp: serverTimestamp(),
+      };
+      await addDoc(collection(db, `artifacts/${appId}/public/data/log`), log);
+      console.log(`✅ 記録: ${type} x${count}`);
+    };
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- ✅ ヘッダーはloadHeader()で挿入 -->
+
+  <main class="flex-grow flex flex-col justify-start items-center">
+    <div class="w-full max-w-xl flex flex-col gap-4 py-6">
+      <button onclick="logCount('localin', 1)" class="counter-button w-full bg-orange-500 hover:bg-orange-600 text-white rounded-2xl p-8 text-6xl font-bold">+1</button>
+      <div class="flex space-x-4">
+        <button onclick="logCount('localin', 5)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+5</button>
+        <button onclick="logCount('localin', 10)" class="counter-button flex-1 bg-gray-500 text-white rounded-2xl p-6 text-4xl font-bold">+10</button>
+      </div>
+    <footer class="p-4 bg-gray-200 text-gray-700 border-t border-gray-300">
+        <a href="index.html" class="block w-full text-center bg-gray-400 hover:bg-gray-500 py-3 rounded-lg shadow-md text-white font-semibold text-lg">
+            メニューへ戻る
+        </a>
+    </footer>
+    </div>
+  </main>
+
+</body>
+</html>
