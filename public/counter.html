@@ -46,6 +46,7 @@
     }
   </script>
 </head>
+
 <body>
   <!-- ✅ ヘッダー（index.htmlと完全共通） -->
   <header id="info-header" class="bg-cyan-view text-white flex-shrink-0 z-10">
@@ -75,7 +76,7 @@
     </div>
   </header>
 
-  <!-- ✅ メインカウンター -->
+  <!-- ✅ カウンター本体 -->
   <div class="main-content flex flex-col justify-start items-center">
     <div class="w-full max-w-xl flex flex-col gap-4 py-2">
       <button onclick="logCount('in', 1)" class="counter-button large-counter-button w-full bg-green-in text-white rounded-2xl hover:bg-green-700 p-8 flex items-center justify-center font-extrabold text-[8rem]">
@@ -92,24 +93,18 @@
     <a href="index.html" class="block text-center bg-gray-400 hover:bg-gray-500 active:bg-gray-600 py-3 rounded-lg shadow-md font-semibold text-lg text-white">メニューへ戻る</a>
   </footer>
 
-  <!-- ✅ Firebaseロジック（日付キー統一版） -->
+  <!-- ✅ Firebase外部化版 ロジック -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { initializeFirebase } from "/js/firebase-config.js";
+    import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } 
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
-      authDomain: "setapanmarketcounter.firebaseapp.com",
-      projectId: "setapanmarketcounter",
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
+    const { db } = await initializeFirebase();
+    const appId = "setapanmarketcounter";
     let userId = null;
     let dayMap = {}; // { day1: "2025-11-01", day2: "2025-11-02" }
 
+    // 要素取得
     const el = {
       current: document.getElementById("current-count-value"),
       wait: document.getElementById("wait-time-value"),
@@ -120,6 +115,7 @@
       currentDate: document.getElementById("current-date-time")
     };
 
+    // 日付変換
     const toYMD = (ts) => {
       const d = ts.toDate ? ts.toDate() : new Date(ts);
       return d.toISOString().split("T")[0];
@@ -129,7 +125,8 @@
       return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
     };
 
-    onSnapshot(doc(db, "artifacts/setapanmarketcounter/public/data/static/day"), (snap) => {
+    // 日付情報取得
+    onSnapshot(doc(db, `artifacts/${appId}/public/data/static/day`), (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
       dayMap.day1 = toYMD(data.day1);
@@ -138,15 +135,16 @@
       el.date2.textContent = toMD(data.day2);
     });
 
+    // 時計
     function updateClock() {
       const now = new Date();
       el.currentDate.textContent = `現在日時: ${now.toLocaleDateString("ja-JP", {month:"2-digit", day:"2-digit"})} ${now.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}`;
     }
-    setInterval(updateClock, 1000); updateClock();
+    setInterval(updateClock, 1000);
+    updateClock();
 
+    // ✅ カウント登録関数
     window.logCount = async (type, count) => {
-      if (!userId) return alert("認証中です。少しお待ちください。");
-
       const now = new Date();
       const today = now.toISOString().split("T")[0];
       const event_day = (today === dayMap.day1) ? dayMap.day1 : (today === dayMap.day2 ? dayMap.day2 : today);
@@ -155,15 +153,11 @@
         type, count,
         event_day,
         timestamp: serverTimestamp(),
-        user_id: userId
       };
 
-      await addDoc(collection(db, "artifacts/setapanmarketcounter/public/data/log"), logEntry);
+      await addDoc(collection(db, `artifacts/${appId}/public/data/log`), logEntry);
       console.log(`Logged ${type} x${count} (${event_day})`);
     };
-
-    signInAnonymously(auth);
-    onAuthStateChanged(auth, user => { if (user) userId = user.uid; });
   </script>
 </body>
 </html>
