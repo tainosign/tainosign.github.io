@@ -23,24 +23,29 @@ export async function loadHeader(appId = "setapanmarketcounter") {
     date2: document.getElementById("event-day2-date"),
   };
 
-  // === JST変換用関数 ===
-  const toJSTDate = (ts) => {
-    const date = ts.toDate ? ts.toDate() : new Date(ts);
-    const jst = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-    return jst;
-  };
+const toYMD_JST = (ts) => {
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const jstString = date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+  const jst = new Date(jstString);
+  const y = jst.getFullYear();
+  const m = String(jst.getMonth() + 1).padStart(2, "0");
+  const d = String(jst.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+  
+const toMD_JST = (ts) => {
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  return date.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
+};
 
-  const toYMD = (ts) => toJSTDate(ts).toISOString().split("T")[0];
-  const toMD = (ts) => {
-    const d = toJSTDate(ts);
-    return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
-  };
-
-  const getTodayYMD = () => {
-    const now = new Date();
-    const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-    return jst.toISOString().split("T")[0];
-  };
+const getTodayYMD = () => {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
+  const y = jst.getFullYear();
+  const m = String(jst.getMonth() + 1).padStart(2, "0");
+  const d = String(jst.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
 
   let dayMap = {};
   let todayYMD = getTodayYMD();
@@ -49,8 +54,8 @@ export async function loadHeader(appId = "setapanmarketcounter") {
   onSnapshot(doc(db, `artifacts/${appId}/public/data/static/day`), (snap) => {
     if (!snap.exists()) return;
     const data = snap.data();
-    dayMap.day1 = toYMD(data.day1);
-    dayMap.day2 = toYMD(data.day2);
+    dayMap.day1 = toYMD_JST(data.day1);
+    dayMap.day2 = toYMD_JST(data.day2);
     el.date1.textContent = `[${toMD(data.day1)}]`;
     el.date2.textContent = `[${toMD(data.day2)}]`;
   });
@@ -66,7 +71,7 @@ export async function loadHeader(appId = "setapanmarketcounter") {
       const type = data.type;
       const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
       const jst = new Date(timestamp.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-      const logDate = jst.toISOString().split("T")[0];
+      const logDate = toYMD_JST(timestamp);
 
       // === 今日のリアルタイム ===
       if (logDate === todayYMD) {
