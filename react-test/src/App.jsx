@@ -1,5 +1,5 @@
 import React from "react";
-import SampleCard from "./components/SampleCard";
+import SampleCard from "./components/SampleCard.jsx";
 
 export default function App() {
   return (
