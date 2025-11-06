@@ -2,15 +2,14 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInAnonymously, signInWithCustomToken } from "firebase/auth";
 import { getFirestore, setLogLevel } from "firebase/firestore";
 
-// グローバル変数から設定を取得し、ない場合はユーザー提供のフォールバックを使用
-// アプリケーションID
-export const appId = typeof __app_id !== 'undefined' ? __app_id : 'setapanmarketcounter'; // プロジェクトIDに合わせる
+// グローバル変数から設定を取得
+export const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // Firebase設定
 const firebaseConfig = typeof __firebase_config !== 'undefined'
     ? JSON.parse(__firebase_config)
     : {
-        // ユーザー提供のフォールバック設定
+        // Fallback configuration (If running outside of Canvas environment)
         apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
         authDomain: "setapanmarketcounter.firebaseapp.com",
         projectId: "setapanmarketcounter",
@@ -24,27 +23,24 @@ const firebaseConfig = typeof __firebase_config !== 'undefined'
 const customToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
 /**
- * Firebaseを初期化し、認証を行う
+ * Initializes Firebase app, Firestore, and attempts authentication.
  * @returns {Promise<{db: import('firebase/firestore').Firestore, auth: import('firebase/auth').Auth}>}
  */
 export async function initializeFirebase() {
     try {
-        // デバッグログを有効化
         setLogLevel('debug');
 
-        // 既存アプリがあれば再利用し、なければ初期化
+        // Reuse existing app or initialize
         const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // 認証状態の確認とサインイン
+        // Authentication logic using custom token or anonymous sign-in
         if (!auth.currentUser) {
             if (customToken) {
-                // カスタムトークンでサインイン
                 await signInWithCustomToken(auth, customToken);
                 console.log("🟢 Firebase: Signed in with custom token.");
             } else {
-                // 匿名サインイン
                 await signInAnonymously(auth);
                 console.log("🟢 Firebase: Signed in anonymously.");
             }
@@ -56,6 +52,6 @@ export async function initializeFirebase() {
 
     } catch (error) {
         console.error("🔴 Fatal Firebase Initialization Error:", error);
-        throw error; // 呼び出し元でエラーを処理させる
+        throw error;
     }
 }
