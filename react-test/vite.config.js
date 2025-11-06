@@ -1,10 +1,11 @@
+// vite.config.js
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: "/react-test/",
   plugins: [react()],
+  root: "./react-test", // ← react-testフォルダをルートに
   build: {
-    outDir: "dist",
+    outDir: "../dist", // 出力先をルート上に
   },
 });
