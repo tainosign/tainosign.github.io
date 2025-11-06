@@ -3,17 +3,13 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [
-    react({
-      include: /\.(jsx|js|ts|tsx)$/,
-    }),
-  ],
+  plugins: [react()],
   root: '.',
   build: {
     outDir: 'dist',
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
-      // external: [/^firebase\//], ← 削除
+      external: [], // 外部化は不要なら空
     },
     commonjsOptions: {
       include: [/node_modules/],
