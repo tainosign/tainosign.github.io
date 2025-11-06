@@ -1,5 +1,6 @@
-import { collection, query, getDocs } from "firebase/firestore"; // 💡 firestoreからインポート
-import { toMD_JST } from '../hooks/useHeaderData'; // toMD_JSTを再利用
+import { collection, query, getDocs } from "firebase/firestore"; 
+// 💡 既存の time.js から JST ヘルパー関数をインポート
+import { toMD_JST } from '../utils/time'; 
 
 export function getPublicCollectionPath(appId, name) {
   return `artifacts/${appId}/public/data/${name}`; // 先頭のスラッシュを削除 (doc/collectionパスの慣習)
@@ -9,7 +10,7 @@ export function getPublicCollectionPath(appId, name) {
  * ログコレクションから記録された日付のリストを取得し、JSTで処理します。
  * @param {import('firebase/firestore').Firestore} db Firestoreインスタンス
  * @param {string} appId アプリケーションID
- * @returns {Promise<string[]>} 重複のない日付文字列（MM/DD形式）の配列
+ * @returns {Promise<string[]>} 重複のない日付文字列（[MM/DD]形式）の配列
  */
 export async function fetchRecordedDates(db, appId) {
   const logRef = collection(db, getPublicCollectionPath(appId, "log"));
@@ -26,7 +27,7 @@ export async function fetchRecordedDates(db, appId) {
       if (data.timestamp) {
         // Firestore Timestamp または Date オブジェクトからDateインスタンスを取得
         const ts = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-        // JSTのMM/DD形式に変換 (toMD_JSTを使用)
+        // JSTの[MM/DD]形式に変換 (toMD_JSTを使用)
         const dateStr = toMD_JST(ts);
         
         // タイムスタンプを比較し、最新のものだけを保持（ただし、ここでは重複除去が主目的）
