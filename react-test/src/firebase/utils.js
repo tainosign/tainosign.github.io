@@ -1,21 +1,24 @@
 // utils.js
-import { db } from "./config";
 import { toMD_JST } from "../utils/time";
 
+/**
+ * コレクションのパスを取得
+ */
 export function getPublicCollectionPath(appId, name) {
   return `artifacts/${appId}/public/data/${name}`;
 }
 
 /**
- * ログコレクションから記録された日付のリストを取得
- * @param {string} appId 
- * @returns {Promise<string[]>} 重複のない日付文字列（[MM/DD]形式）の配列
+ * Firestore の snapshot から日付を取得
+ * @param {firebase.firestore.Firestore} db
+ * @param {string} appId
+ * @returns {Promise<string[]>} 重複のない日付文字列（[MM/DD]形式）
  */
-export async function fetchRecordedDates(appId) {
+export async function fetchRecordedDates(db, appId) {
   const logRef = db.collection(getPublicCollectionPath(appId, "log"));
 
   try {
-    const snapshot = await logRef.get(); // v8方式
+    const snapshot = await logRef.get();
     const dates = {};
 
     snapshot.forEach((doc) => {
