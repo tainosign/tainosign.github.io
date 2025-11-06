@@ -1,47 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getApp } from 'firebase/app';
+import React from 'react';
+// config.jsから認証関連の関数はもう必要ありません。
 // 以前作成したコンポーネントとフックをインポート
 import { Header } from './components/header';
 import { useHeaderData } from './hooks/useHeaderData';
 
-// 認証ユーザーIDと認証ローディング状態を取得するためのヘルパーフック
-// (本来は専用ファイルに切り出すべきですが、App.jsx内で簡略化)
+// 認証ユーザーIDと認証ローディング状態を取得するためのヘルパーフック (削除)
+/*
 const useAuthId = () => {
-    const [userId, setUserId] = useState(null);
-    const [isAuthLoading, setIsAuthLoading] = useState(true);
-
-    useEffect(() => {
-        try {
-            // config.jsでFirebaseが初期化されていることを前提に、Authインスタンスを取得
-            const auth = getAuth(getApp()); 
-            
-            const unsubscribe = onAuthStateChanged(auth, (user) => {
-                setUserId(user ? user.uid : null);
-                setIsAuthLoading(false);
-            });
-
-            return () => unsubscribe();
-        } catch (error) {
-            console.error("Failed to get Firebase Auth instance:", error);
-            setIsAuthLoading(false);
-        }
-    }, []);
-
-    return [userId, isAuthLoading];
+    // ... 削除されたロジック
 };
+*/
 
 
 export default function App() {
-    // 1. データ取得フックの利用
-    const [headerData, isDataLoading] = useHeaderData();
+    // 1. データ取得フックの利用 (Firebaseの初期化・認証、データ取得の全てを含む)
+    const [headerData, isDataLoading, userId, isAuthLoading] = useHeaderData();
     
-    // 2. 認証情報フックの利用
-    const [userId, isAuthLoading] = useAuthId();
+    // 2. 認証情報フックの利用 (削除)
+    // const [userId, isAuthLoading] = useAuthId();
 
     // 3. 総合的なローディング状態
+    // データの読み込み、または認証状態の確定に時間がかかっている場合
     const isLoading = isAuthLoading || isDataLoading;
 
+    // メニュー項目 (変更なし)
     const menuItems = [
         { href: "counterlocal.html", color: "bg-orange-500 hover:bg-orange-600 text-white", label: "🟠 地域優先入場カウンター" },
         { href: "counter.html", color: "bg-green-600 hover:bg-green-700 text-white", label: "🟢 入場口カウンター" },
