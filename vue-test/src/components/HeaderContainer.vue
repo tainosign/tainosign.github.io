@@ -1,19 +1,17 @@
 <template>
-  <header class="bg-gray-200 p-4 flex justify-between items-center">
-    <h1>{{ title }}</h1>
-    <nav>
-      <a href="/index.html" class="mr-2">ホーム</a>
-      <a href="/counter.html">カウンター</a>
-    </nav>
+  <header class="w-full bg-white shadow-md p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">メインメニュー</h1>
+    <img src="/qr.png" alt="QRコード" class="h-10 w-10" />
   </header>
 </template>
 
-<script setup>
-const props = defineProps({
-  title: { type: String, default: 'ヘッダー' }
-})
+<script lang="ts">
+import { defineComponent } from 'vue';
+
+export default defineComponent({
+  name: 'HeaderContainer',
+});
 </script>
 
 <style scoped>
-header { font-weight: bold; }
 </style>
