@@ -1,14 +1,57 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-// Firebaseの初期化関数とappIdをconfigからインポート
-import { initializeFirebase, appId as globalAppId } from '../firebase/config'; 
-import { getJSTDateYMD, toYMD_JST, toMD_JST } from '../utils/time';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { initializeFirebase, appId as globalAppId } from '../firebase/config'; 
 
-// Firestoreのパス生成ヘルパー (appIdはconfigから取得したグローバルなものを使用)
+// --- 時間操作ヘルパー（省略しない） ---
+const getJSTDateYMD = () => {
+    const now = new Date();
+    const jstDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    
+    const year = jstDate.getFullYear();
+    const month = String(jstDate.getMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+};
+
+const formatJSTDate = (timestamp, format) => {
+    if (!timestamp) return '--/--';
+    let date;
+    if (timestamp instanceof Date) {
+        date = timestamp;
+    } else if (timestamp.toDate) {
+        date = timestamp.toDate();
+    } else {
+        return '--/--';
+    }
+
+    const options = {
+        timeZone: "Asia/Tokyo",
+        year: format === 'YMD' ? 'numeric' : undefined,
+        month: '2-digit',
+        day: '2-digit',
+    };
+    
+    const parts = new Intl.DateTimeFormat('ja-JP', options).formatToParts(date);
+
+    const month = parts.find(p => p.type === 'month')?.value || 'MM';
+    const day = parts.find(p => p.type === 'day')?.value || 'DD';
+    
+    if (format === 'YMD') {
+        const year = parts.find(p => p.type === 'year')?.value || 'YYYY';
+        return `${year}${month}${day}`;
+    }
+    if (format === 'MD') return `${month}/${day}`;
+    return `${month}/${day}`;
+};
+
+const toYMD_JST = (timestamp) => formatJSTDate(timestamp, 'YMD');
+const toMD_JST = (timestamp) => formatJSTDate(timestamp, 'MD');
+// ----------------------------------------
+
 const getSummaryPath = (appId, dateYMD) => `artifacts/${appId}/public/data/summary/${dateYMD}`;
 const getStaticDayPath = (appId) => `artifacts/${appId}/public/data/static/day`;
 
-// 初期データ構造
 const initialHeaderData = {
     currentCount: 0,
     localInCount: 0,
@@ -21,18 +64,13 @@ const initialHeaderData = {
     totalVisitors: 0,
 };
 
-/**
- * summaryドキュメントの存在を確認し、なければ初期化する
- * @param {import('firebase/firestore').Firestore} db
- */
 async function ensureSummaryDoc(db, path) {
     const ref = doc(db, path);
     try {
         const snap = await getDoc(ref);
         if (!snap.exists()) {
-            // 初期データ (header-loader.jsのロジックに従う)
             await setDoc(ref, { in: 0, out: 0, localin: 0, exitin: 0, createdAt: new Date() }, { merge: true });
-            console.log(`🟢 Summaryを初期化: ${path}`);
+            console.log(`🟢 Summary initialized: ${path}`);
         }
     } catch (error) {
         console.error("Error ensuring summary document:", path, error);
@@ -40,60 +78,61 @@ async function ensureSummaryDoc(db, path) {
     return ref;
 }
 
-/**
- * Headerに表示するリアルタイムデータと過去の集計データを取得するカスタムフック
- * Firebaseの初期化と認証処理を内部で実行する
- * @returns {[object, boolean]} [headerData, isDataLoading]
- */
 export const useHeaderData = () => {
-    // ------------------------------------
-    // State管理
-    // ------------------------------------
-    // dbとappIdはフック内部で管理する
     const [db, setDb] = useState(null);
-    const appId = globalAppId; // config.jsから取得
+    const appId = globalAppId;
+
+    const [userId, setUserId] = useState(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
+
     const [headerData, setHeaderData] = useState(initialHeaderData);
     const [isDataLoading, setIsDataLoading] = useState(true);
-    const [isFirebaseReady, setIsFirebaseReady] = useState(false); // Firebase初期化完了フラグ
+    const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
-    // ------------------------------------
-    // 1. Firebase初期化と認証処理 (初回マウント時のみ実行)
-    // ------------------------------------
+    // 1. Firebase初期化と認証処理
     useEffect(() => {
         let isMounted = true;
+        let unsubscribeAuth;
 
-        const setupFirebase = async () => {
+        const setupFirebaseAndAuth = async () => {
             try {
-                // config.jsで定義された初期化関数を実行
-                const { db } = await initializeFirebase(); 
+                const { db, auth } = await initializeFirebase(); 
+                
                 if (isMounted) {
                     setDb(db);
                     setIsFirebaseReady(true);
                 }
+                
+                unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+                    if (isMounted) {
+                        setUserId(user ? user.uid : null);
+                        setIsAuthLoading(false); // 認証状態が確定
+                    }
+                });
+
             } catch (error) {
                 console.error("Failed to initialize Firebase in useHeaderData:", error);
                 if (isMounted) {
-                    setIsDataLoading(false); // 失敗したらローディングを解除
+                    setIsDataLoading(false);
+                    setIsAuthLoading(false);
                 }
             }
         };
 
-        setupFirebase();
-
-        // クリーンアップ
-        return () => {
-            isMounted = false;
+        setupFirebaseAndAuth();
+        
+        return () => { 
+            isMounted = false; 
+            if (unsubscribeAuth) unsubscribeAuth();
         };
-    }, []); // 依存配列が空なので、マウント時のみ実行
+    }, []);
 
-    // ------------------------------------
-    // 2. データ監視 (Firebaseの準備ができたら実行)
-    // ------------------------------------
+    // 2. データ監視
     useEffect(() => {
-        // Firebaseの準備ができていない場合は待機
-        if (!isFirebaseReady || !db || !appId) {
-             if (isFirebaseReady) setIsDataLoading(false); // 認証済みだがデータがない場合
-             return;
+        // 認証状態が確定してからデータ取得を開始
+        if (!isFirebaseReady || !db || !appId || isAuthLoading) {
+            if (isFirebaseReady && !isAuthLoading) setIsDataLoading(false);
+            return;
         }
 
         setIsDataLoading(true);
@@ -105,9 +144,6 @@ export const useHeaderData = () => {
             setHeaderData(prev => ({ ...prev, ...newValues }));
         };
         
-        // ------------------------------------
-        // Day Summary (過去来場者数) の監視関数
-        // ------------------------------------
         const startDaySummaryListener = async (dateYMD, dayIndex) => {
             const path = getSummaryPath(appId, dateYMD);
             try {
@@ -116,22 +152,18 @@ export const useHeaderData = () => {
                 const listener = onSnapshot(ref, (snap) => {
                     if (!snap.exists()) return;
                     const d = snap.data();
-                    // 過去の来場者数は、IN側のすべての合計
                     const total = (d.in || 0) + (d.localin || 0) + (d.exitin || 0);
                     
                     if (dayIndex === 1) {
                         day1Total = total;
-                        updateState({
-                            day1Visitors: day1Total,
-                            totalVisitors: day1Total + day2Total,
-                        });
                     } else if (dayIndex === 2) {
                         day2Total = total;
-                        updateState({
-                            day2Visitors: day2Total,
-                            totalVisitors: day1Total + day2Total,
-                        });
                     }
+                    
+                    updateState({
+                        [`day${dayIndex}Visitors`]: total,
+                        totalVisitors: day1Total + day2Total,
+                    });
                 }, (error) => console.error(`Error listening to Day ${dayIndex} summary:`, error));
 
                 return listener;
@@ -141,13 +173,9 @@ export const useHeaderData = () => {
             }
         };
 
-        // ------------------------------------
-        // イベント日付（static/day）の取得とDay Summary監視の開始
-        // ------------------------------------
         const setupDayListeners = async () => {
             const dayDocRef = doc(db, getStaticDayPath(appId));
             
-            // static/dayは滅多に変わらないため、getDocで取得
             try {
                 const daySnap = await getDoc(dayDocRef);
                 
@@ -161,7 +189,6 @@ export const useHeaderData = () => {
                         day2Date: data.day2 ? toMD_JST(data.day2) : initialHeaderData.day2Date,
                     });
                     
-                    // Day1/Day2のサマリー監視を開始し、クリーンアップ関数を保存
                     if (day1YMD) unsubscribeDay1 = await startDaySummaryListener(day1YMD, 1);
                     if (day2YMD) unsubscribeDay2 = await startDaySummaryListener(day2YMD, 2);
                 }
@@ -170,9 +197,6 @@ export const useHeaderData = () => {
             }
         };
 
-        // ------------------------------------
-        // 今日の Summary（場内人数）の監視を開始
-        // ------------------------------------
         const startTodaySummaryListener = async () => {
             const todayYMD = getJSTDateYMD();
             const path = getSummaryPath(appId, todayYMD);
@@ -188,15 +212,13 @@ export const useHeaderData = () => {
                     const localIn = d.localin || 0;
                     const exitIn = d.exitin || 0;
                     
-                    // 場内人数 = (入場 + 優先入場 + 出口からの再入場) - 出口
                     const current = inCount + localIn + exitIn - outCount;
                     
-                    // 待ち時間計算 (current / 100 * 5)
                     const wait = (current / 100 * 5);
                     const waitTime = isNaN(wait) || current < 0 ? "--" : wait.toFixed(1);
 
                     updateState({
-                        currentCount: current < 0 ? 0 : current, // マイナスは0とする
+                        currentCount: current < 0 ? 0 : current,
                         localInCount: localIn,
                         exitInCount: exitIn,
                         waitTime: waitTime,
@@ -213,18 +235,17 @@ export const useHeaderData = () => {
             }
         };
         
-        // メイン実行
         setupDayListeners();
         startTodaySummaryListener();
 
-        // クリーンアップ関数: コンポーネントがアンマウントされる際にリスナーを停止する
+        // クリーンアップ
         return () => {
             if (unsubscribeToday) unsubscribeToday();
             if (unsubscribeDay1) unsubscribeDay1();
             if (unsubscribeDay2) unsubscribeDay2();
         };
 
-    }, [isFirebaseReady, db, appId]); // Firebaseの準備ができたとき、またはdb/appIdが変わった場合に再実行
+    }, [isFirebaseReady, db, appId, isAuthLoading]);
 
-    return [headerData, isDataLoading];
+    return [headerData, isDataLoading, userId, isAuthLoading];
 };
