@@ -10,69 +10,135 @@ const initialHeaderData = {
   currentCount: 0,
   localInCount: 0,
   exitInCount: 0,
-  waitTime: '--',
-  day1Date: '[--/--]',
+  waitTime: "--",
+  day1Date: "[--/--]",
   day1Visitors: 0,
-  day2Date: '[--/--]',
+  day2Date: "[--/--]",
   day2Visitors: 0,
   totalVisitors: 0,
 };
 
-function ensureSummaryDoc(ref) {
-  return ref.get().then(snap => {
+// summary ドキュメントを存在させる
+async function ensureSummaryDoc(db, path) {
+  const ref = db.doc(path);
+  try {
+    const snap = await ref.get();
     if (!snap.exists) {
-      ref.set({ in: 0, out: 0, localin: 0, exitin: 0, createdAt: new Date() }, { merge: true });
-      console.log("🟢 Summary initialized:", ref.path);
+      await ref.set({ in: 0, out: 0, localin: 0, exitin: 0, createdAt: new Date() });
     }
-    return ref;
-  }).catch(err => {
-    console.error("Error ensuring summary document:", ref.path, err);
-    return ref;
-  });
+  } catch (error) {
+    console.error("Error ensuring summary document:", path, error);
+  }
+  return ref;
 }
 
 export const useHeaderData = () => {
   const [headerData, setHeaderData] = useState(initialHeaderData);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [userId, setUserId] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Auth状態監視
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(user => {
+    let isMounted = true;
+
+    // 認証
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!isMounted) return;
       setUserId(user ? user.uid : null);
+      setIsAuthLoading(false);
     });
-    return () => unsubscribe();
+
+    // 匿名サインイン
+    if (!auth.currentUser) {
+      auth.signInAnonymously().catch(console.error);
+    }
+
+    return () => {
+      isMounted = false;
+      unsubscribeAuth();
+    };
   }, []);
 
-  // データ監視
   useEffect(() => {
-    const todayYMD = getJSTDateYMD().replace(/-/g, '');
-    const todayRef = db.collection(getSummaryPath(globalAppId, todayYMD)).doc("summaryDoc");
+    if (isAuthLoading) return;
+    setIsDataLoading(true);
 
-    ensureSummaryDoc(todayRef).then(ref => {
-      const unsubscribe = ref.onSnapshot(doc => {
-        if (!doc.exists) return;
-        const d = doc.data();
+    let unsubToday, unsubDay1, unsubDay2;
+    let day1Total = 0,
+      day2Total = 0;
+
+    const updateState = (values) => setHeaderData((prev) => ({ ...prev, ...values }));
+
+    const startDaySummaryListener = async (dateYMD, dayIndex) => {
+      const path = getSummaryPath(globalAppId, dateYMD);
+      const ref = await ensureSummaryDoc(db, path);
+
+      const listener = ref.onSnapshot((snap) => {
+        if (!snap.exists) return;
+        const d = snap.data();
+        const total = (d.in || 0) + (d.localin || 0) + (d.exitin || 0);
+        if (dayIndex === 1) day1Total = total;
+        else if (dayIndex === 2) day2Total = total;
+
+        updateState({
+          [`day${dayIndex}Visitors`]: total,
+          totalVisitors: day1Total + day2Total,
+        });
+      });
+
+      return listener;
+    };
+
+    const setupDayListeners = async () => {
+      const dayRef = db.doc(getStaticDayPath(globalAppId));
+      const snap = await dayRef.get();
+      if (!snap.exists) return;
+      const data = snap.data();
+
+      const day1YMD = data.day1 ? toYMD_JST(data.day1).replace(/-/g, "") : null;
+      const day2YMD = data.day2 ? toYMD_JST(data.day2).replace(/-/g, "") : null;
+
+      updateState({
+        day1Date: data.day1 ? toMD_JST(data.day1) : initialHeaderData.day1Date,
+        day2Date: data.day2 ? toMD_JST(data.day2) : initialHeaderData.day2Date,
+      });
+
+      if (day1YMD) unsubDay1 = await startDaySummaryListener(day1YMD, 1);
+      if (day2YMD) unsubDay2 = await startDaySummaryListener(day2YMD, 2);
+    };
+
+    const startTodayListener = async () => {
+      const todayYMD = getJSTDateYMD().replace(/-/g, "");
+      const path = getSummaryPath(globalAppId, todayYMD);
+      const ref = await ensureSummaryDoc(db, path);
+
+      unsubToday = ref.onSnapshot((snap) => {
+        if (!snap.exists) return;
+        const d = snap.data();
         const current = (d.in || 0) + (d.localin || 0) + (d.exitin || 0) - (d.out || 0);
-        const wait = (current / 100 * 5);
+        const wait = (current / 100) * 5;
         const waitTime = isNaN(wait) || current < 0 ? "--" : wait.toFixed(1);
 
-        setHeaderData(prev => ({
-          ...prev,
+        updateState({
           currentCount: current < 0 ? 0 : current,
           localInCount: d.localin || 0,
           exitInCount: d.exitin || 0,
-          waitTime: waitTime,
-        }));
-        setIsDataLoading(false);
-      }, error => {
-        console.error("Error listening Today summary:", error);
+          waitTime,
+        });
+
         setIsDataLoading(false);
       });
+    };
 
-      return () => unsubscribe();
-    });
-  }, []);
+    setupDayListeners();
+    startTodayListener();
 
-  return [headerData, isDataLoading, userId];
+    return () => {
+      unsubToday?.();
+      unsubDay1?.();
+      unsubDay2?.();
+    };
+  }, [isAuthLoading]);
+
+  return [headerData, isDataLoading, userId, isAuthLoading];
 };
