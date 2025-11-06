@@ -88,10 +88,13 @@ function setupRealtimeListener(appId) {
     const exitIn = d.exitin || 0;
     const current = inCount + localIn + exitIn - outCount;
 
-    const display = document.getElementById("current-count-value");
-    if (display) {
-      display.innerHTML = `${current} <span class="text-sm text-gray-200">(内、優先入場:${localIn} 出口:${exitIn})</span>`;
-    }
+    // ✅ 各要素を個別更新（header.htmlの構造を保つ）
+    const currentEl = document.getElementById("current-count-value");
+    const localEl = document.getElementById("localin-count");
+    const exitEl = document.getElementById("exitin-count");
+
+    if (currentEl) currentEl.textContent = current;
+    if (localEl) localEl.textContent = localIn;
+    if (exitEl) exitEl.textContent = exitIn;
   });
 }
-
