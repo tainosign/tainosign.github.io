@@ -2,12 +2,24 @@ import React from 'react';
 // appIdをconfigから直接インポート
 import { appId as globalAppId } from '../firebase/config'; 
 
+// ユーザーのリクエストに基づき、QRコード画像のパス/URLを定義します。
+// 実際のReact環境では、`import QrImg from '../assets/images/qr.png';`としてインポートされますが、
+// この環境では直接ファイルを参照できないため、視覚的な代替手段としてプレースホルダーURLを使用します。
+const QR_CODE_IMAGE_URL = '../assets/images/qr.png';
+
+
 /**
- * QRコードのプレースホルダーコンポーネント
+ * QRコード画像コンポーネント
+ * ユーザーが指定したパスへの画像表示意図を反映
  */
-const QrCodePlaceholder = () => (
-    <div className="text-xs text-gray-400 text-center">QR画像未設定</div>
+const QrCodeImage = () => (
+    <img 
+        src={QR_CODE_IMAGE_URL} 
+        alt="入場用QRコード" 
+        className="w-full h-full object-contain"
+    />
 );
+
 
 /**
  * Headerコンポーネント (header.htmlをReact/JSXで再現)
@@ -36,7 +48,8 @@ export const Header = ({ userId, isLoading, data }) => {
                 
                 {/* QRコードコンテナ */}
                 <div id="qr-code-container" className="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
-                    <QrCodePlaceholder />
+                    {/* QrCodeImageコンポーネントを配置 */}
+                    <QrCodeImage />
                 </div>
 
                 {/* 情報エリア */}
