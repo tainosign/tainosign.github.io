@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>メインメニュー1</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/tailwind-config.js"></script>
     
     <style>
         /* Base styles for the main layout */
@@ -31,67 +32,15 @@
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
         }
     </style>
-    <script>
-        // Tailwind CSS configuration with custom colors
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        // カスタムカラー
-                        'green-in': '#00a040',
-                        'red-out': '#e53935',
-                        'yellow-report': '#ffc107',
-                        'cyan-view': '#17a2b8',
-                        'orange-calc': '#ff9800',
-                        'blue-time':'#00aff0',
-                    }
-                }
-            }
-        }
+    <script type="module">
+    import { loadHeader } from "/js/header-loader.js";
+    import { setupCounter } from "/js/counter-logic.js";
+
+    await loadHeader();
+    await setupCounter("setapanmarketcounter");
     </script>
 </head>
 <body>
-
-    <!-- ヘッダーコンテナ (情報表示エリア) - stickyを適用し、常に上部に表示 -->
-    <header id="info-header" class="bg-cyan-view text-white p-4 shadow-2xl flex-shrink-0 sticky top-0 z-10">
-        <div class="max-w-4xl mx-auto flex justify-between items-start space-x-4">
-            
-            <!-- 1. QRコードエリア (左側) -->
-            <div id="qr-code-container" class="w-24 h-24 flex-shrink-0 bg-white p-1 rounded-lg shadow-inner flex items-center justify-center border-2 border-cyan-200">
-                <img id="qr-code-image" 
-                    src="qr.png" 
-                    alt="QRコード画像をここに配置" 
-                    class="object-contain rounded w-full h-full"
-                    onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\'text-xs text-gray-400 text-center\'>QR画像\n未設定</div>'">
-            </div>
-
-            <!-- 2. 情報エリア (右側) - 表示内容をご要望に合わせて修正 -->
-            <div class="flex-1 flex flex-col justify-between space-y-2 min-w-0 text-right">
-                
-                <!-- TOP ROW: 場内人数 (最も大きく表示) -->
-                <div id="current-count-display" class="text-lg md:text-5xl font-extrabold flex items-end justify-end">
-                    <!-- 場内人数:0 -->
-                    場内人数: 
-                    <span id="current-count-value" class="ml-2 text-4xl text-yellow-400 tabular-nums">0</span>
-                </div>
-
-                <!-- MIDDLE ROW: 100人あたり待ち時間 -->
-                <div id="wait-time-display" class="w-full text-base md:text-lg font-light opacity-95">
-                    <!-- 100人当たり待ち時間: --分 -->
-                    100人当たり待ち時間: 
-                    <span id="wait-time-value" class="font-bold tabular-nums">--</span>分
-                </div>
-                
-                <!-- BOTTOM ROW: 入場者数サマリー (計:を含む表示) -->
-                <div class="w-full text-base md:text-lg font-light opacity-90 pt-1 border-t border-cyan-400/50">
-                    <!-- 入場者数: Day(日付)10人 Day(日付)20人 計:30人 -->
-                    Day1 <span id="event-day1-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day1-visitors">0</span>人 
-                    Day2 <span id="event-day2-date">--/--</span>：<span class="font-bold ml-1 tabular-nums" id="day2-visitors">0</span>人 
-                    計:<span class="font-bold ml-1 tabular-nums" id="total-visitors">0</span>人
-                </div>
-            </div>
-        </div>
-    </header>
 
     <!-- メインメニューコンテナ -->
     <div class="main-content flex flex-col justify-start items-center">
@@ -139,122 +88,8 @@
             
         </div>
     </div>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-  getFirestore, doc, onSnapshot, collection, query, where 
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-// ==================== 基本設定 ====================
-const firebaseConfig = {
-  apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
-  authDomain: "setapanmarketcounter.firebaseapp.com",
-  projectId: "setapanmarketcounter",
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-let dayMap = {}; // { day1: "2025-11-01", day2: "2025-11-02" }
-let logData = [];
-
-const el = {
-  current: document.getElementById("current-count-value"),
-  wait: document.getElementById("wait-time-value"),
-  day1: document.getElementById("day1-visitors"),
-  day2: document.getElementById("day2-visitors"),
-  total: document.getElementById("total-visitors"),
-  date1: document.getElementById("event-day1-date"),
-  date2: document.getElementById("event-day2-date"),
-};
-
-// ==================== 日付フォーマット関数 ====================
-const toYMD = (ts) => {
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toISOString().split("T")[0]; // "YYYY-MM-DD"
-};
-const toMD = (ts) => {
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" });
-};
-
-// ==================== 日付ドキュメント監視 ====================
-onSnapshot(doc(db, "artifacts/setapanmarketcounter/public/data/static/day"), (snap) => {
-  if (!snap.exists()) return console.warn("⚠️ dayドキュメントが存在しません");
-
-  const data = snap.data();
-  dayMap.day1 = toYMD(data.day1);
-  dayMap.day2 = toYMD(data.day2);
-
-  el.date1.textContent = toMD(data.day1);
-  el.date2.textContent = toMD(data.day2);
-
-  setupLogListener(); // 日付取得後に実行
-});
-
-// ==================== ログ監視 ====================
-function setupLogListener() {
-  onSnapshot(collection(db, "artifacts/setapanmarketcounter/public/data/log"), (snap) => {
-    logData = snap.docs.map(d => d.data());
-    updateDisplay();
-  });
-}
-
-// ==================== 表示更新 ====================
-function updateDisplay() {
-  if (!dayMap.day1 || !dayMap.day2) return;
-
-  const now = new Date();
-  let counts = { in: 0, out: 0, exitin: 0 };
-  let totals = { [dayMap.day1]: 0, [dayMap.day2]: 0 };
-  let recentIn = 0;
-
-  const lookbackMs = 10 * 60 * 1000;
-  const since = new Date(now.getTime() - lookbackMs);
-
-  logData.forEach(l => {
-    const ts = l.timestamp?.toDate ? l.timestamp.toDate() : null;
-    if (!ts) return;
-    const day = l.event_day; // "2025-11-01"など
-    if (!totals.hasOwnProperty(day)) return;
-
-    const c = l.count ?? 1;
-    if (l.type === "in" || l.type === "exitin") {
-      counts.in += c;
-      if (l.type === "exitin") counts.exitin += c;
-      totals[day] += c;
-      if (ts >= since) recentIn += c;
-    } else if (l.type === "out") {
-      counts.out += c;
-    }
-  });
-
-  // 🧮 現在の場内人数
-  const current = Math.max(0, counts.in - counts.out);
-  el.current.textContent = current.toLocaleString();
-
-  // 👥 内訳（出口入場）
-  document.getElementById("exitin-count")?.remove();
-  const exitinEl = document.createElement("span");
-  exitinEl.id = "exitin-count";
-  exitinEl.textContent = `（内、出口${counts.exitin}）`;
-  exitinEl.className = "ml-2 text-base text-gray-300";
-  el.current.insertAdjacentElement("afterend", exitinEl);
-
-  // 📊 各日と合計
-  el.day1.textContent = totals[dayMap.day1].toLocaleString();
-  el.day2.textContent = totals[dayMap.day2].toLocaleString();
-  el.total.textContent = (totals[dayMap.day1] + totals[dayMap.day2]).toLocaleString();
-
-  // ⏱ 待ち時間
-  el.wait.textContent = recentIn > 0 ? ((10 / recentIn) * 100).toFixed(1) : "--";
-}
-
-// ==================== 匿名認証 ====================
-signInAnonymously(auth).then(() => console.log("✅ 匿名認証完了"));
-</script>
 </body>
 </html>
+
 
 
