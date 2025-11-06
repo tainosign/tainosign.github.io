@@ -9,16 +9,14 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
-      // Firebaseのディープインポートパスを解決するため、外部依存関係として明示的にマークします。
-      external: [
-        'firebase/app',
-        'firebase/auth',
-        'firebase/firestore',
-      ],
+      // Rollupのexternal設定を削除: Firebaseがバンドルに含まれるようにします。
     },
-    // commonjsOptionsはexternal設定により不要となるため削除しました。
+    // Firebaseのディープインポート（CommonJS形式）を正しく処理するため、commonjsOptionsを再度有効にします。
+    commonjsOptions: {
+      include: [/node_modules/], 
+    },
   },
-  // 開発環境での依存関係解決を助けるための設定は維持します。
+  // 開発時（dev server）の最適化設定は維持
   optimizeDeps: {
     include: [
       'firebase/app',
