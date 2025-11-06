@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 // ESM向け軽量モジュールに変更
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore/lite';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { initializeFirebase, appId as globalAppId } from '../firebase/config';
 
