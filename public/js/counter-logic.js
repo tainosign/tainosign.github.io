@@ -12,6 +12,15 @@ import {
 
 let db, auth, userId;
 
+function getJSTDateYMD() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
+  const y = jst.getFullYear();
+  const m = String(jst.getMonth() + 1).padStart(2, "0");
+  const d = String(jst.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`; // 例: 2025-11-01
+}
+
 /**
  * カウンター初期化
  */
@@ -25,40 +34,50 @@ export async function setupCounter(appId) {
   setupRealtimeListener(appId);
 
   // ✅ グローバル関数登録（ボタンから呼ばれる）
-  window.logCount = async (type, count) => {
-    if (!db) return;
-    const timestamp = serverTimestamp();
+window.logCount = async (type, count) => {
+  if (!db) return;
+  const jstYMD = getJSTDateYMD();
+  const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
 
-    // === ① 履歴ログを追加（完全履歴） ===
-    const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
-    await addDoc(logRef, {
-      type,
-      count,
-      timestamp,
-      user_id: userId,
+  // === ① 履歴ログを追加（完全履歴） ===
+  const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
+  await addDoc(logRef, {
+    type,
+    count,
+    timestamp: new Date(timestamp),
+    event_day: jstYMD,
+    user_id: userId,
+  });
+
+  // === ② summary を「JST日付」で管理 ===
+  const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
+  const updateData = { updatedAt: new Date(timestamp) };
+
+  if (["in", "out", "localin", "exitin"].includes(type)) {
+    updateData[type] = increment(count);
+  }
+
+  await updateDoc(summaryRef, updateData).catch(async () => {
+    // ドキュメントが存在しない場合は作成
+    await setDoc(summaryRef, {
+      in: 0, out: 0, localin: 0, exitin: 0,
+      [type]: count,
+      updatedAt: new Date(timestamp),
     });
-
-    // === ② summaryをリアルタイム更新 ===
-    const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/today`);
-    const updateData = { updatedAt: timestamp };
-
-    // typeに応じてincrement処理
-    if (["in", "out", "localin", "exitin"].includes(type)) {
-      updateData[type] = increment(count);
-    }
-
-    await updateDoc(summaryRef, updateData);
-  };
+  });
+};
 }
+
+
 
 /**
  * リアルタイム表示（画面内場内人数カウント）
  * summary方式でも従来方式でも動作
  */
 function setupRealtimeListener(appId) {
-  const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/today`);
+  const jstYMD = getJSTDateYMD();
+  const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
 
-  // ✅ summaryのリアルタイム監視（最優先・軽量）
   onSnapshot(summaryRef, (snap) => {
     if (!snap.exists()) return;
     const d = snap.data();
@@ -66,7 +85,6 @@ function setupRealtimeListener(appId) {
     const outCount = d.out || 0;
     const localIn = d.localin || 0;
     const exitIn = d.exitin || 0;
-
     const current = inCount + localIn + exitIn - outCount;
 
     const display = document.getElementById("current-count-value");
@@ -75,3 +93,4 @@ function setupRealtimeListener(appId) {
     }
   });
 }
+
