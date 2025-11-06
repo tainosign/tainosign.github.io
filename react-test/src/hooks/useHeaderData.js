@@ -1,13 +1,7 @@
 // useHeaderData.js
-import { useState, useEffect } from 'react';
-
-// ESM で各機能だけ import
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-
-// JST ヘルパー関数
-import { getJSTDateYMD, toYMD_JST, toMD_JST } from '../utils/time';
+import { useState, useEffect } from "react";
+import { db, auth, appId as globalAppId } from "../firebase/config";
+import { getJSTDateYMD, toYMD_JST, toMD_JST } from "../utils/time";
 
 const getSummaryPath = (appId, dateYMD) => `artifacts/${appId}/public/data/summary/${dateYMD}`;
 const getStaticDayPath = (appId) => `artifacts/${appId}/public/data/static/day`;
@@ -24,174 +18,61 @@ const initialHeaderData = {
   totalVisitors: 0,
 };
 
-async function ensureSummaryDoc(db, path) {
-  const ref = doc(db, path);
-  try {
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, { in: 0, out: 0, localin: 0, exitin: 0, createdAt: new Date() }, { merge: true });
-      console.log(`🟢 Summary initialized: ${path}`);
+function ensureSummaryDoc(ref) {
+  return ref.get().then(snap => {
+    if (!snap.exists) {
+      ref.set({ in: 0, out: 0, localin: 0, exitin: 0, createdAt: new Date() }, { merge: true });
+      console.log("🟢 Summary initialized:", ref.path);
     }
-  } catch (error) {
-    console.error("Error ensuring summary document:", path, error);
-  }
-  return ref;
+    return ref;
+  }).catch(err => {
+    console.error("Error ensuring summary document:", ref.path, err);
+    return ref;
+  });
 }
 
 export const useHeaderData = () => {
-  const [db, setDb] = useState(null);
-  const appId = globalAppId;
-
-  const [userId, setUserId] = useState(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-
   const [headerData, setHeaderData] = useState(initialHeaderData);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  const [userId, setUserId] = useState(null);
 
-  // Firebase初期化と認証処理
+  // Auth状態監視
   useEffect(() => {
-    let isMounted = true;
-    let unsubscribeAuth;
-
-    const setupFirebaseAndAuth = async () => {
-      try {
-        const { db: firestoreDb, auth } = await initializeFirebase();
-        if (isMounted) {
-          setDb(firestoreDb);
-          setIsFirebaseReady(true);
-        }
-
-        unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-          if (isMounted) {
-            setUserId(user ? user.uid : null);
-            setIsAuthLoading(false);
-          }
-        });
-      } catch (error) {
-        console.error("Failed to initialize Firebase:", error);
-        if (isMounted) {
-          setIsDataLoading(false);
-          setIsAuthLoading(false);
-        }
-      }
-    };
-
-    setupFirebaseAndAuth();
-
-    return () => {
-      isMounted = false;
-      if (unsubscribeAuth) unsubscribeAuth();
-    };
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setUserId(user ? user.uid : null);
+    });
+    return () => unsubscribe();
   }, []);
 
   // データ監視
   useEffect(() => {
-    if (!isFirebaseReady || !db || !appId || isAuthLoading) {
-      if (isFirebaseReady && !isAuthLoading) setIsDataLoading(false);
-      return;
-    }
+    const todayYMD = getJSTDateYMD().replace(/-/g, '');
+    const todayRef = db.collection(getSummaryPath(globalAppId, todayYMD)).doc("summaryDoc");
 
-    setIsDataLoading(true);
-    let unsubscribeToday, unsubscribeDay1, unsubscribeDay2;
-    let day1Total = 0;
-    let day2Total = 0;
+    ensureSummaryDoc(todayRef).then(ref => {
+      const unsubscribe = ref.onSnapshot(doc => {
+        if (!doc.exists) return;
+        const d = doc.data();
+        const current = (d.in || 0) + (d.localin || 0) + (d.exitin || 0) - (d.out || 0);
+        const wait = (current / 100 * 5);
+        const waitTime = isNaN(wait) || current < 0 ? "--" : wait.toFixed(1);
 
-    const updateState = (newValues) => {
-      setHeaderData(prev => ({ ...prev, ...newValues }));
-    };
-
-    const startDaySummaryListener = async (dateYMD, dayIndex) => {
-      const path = getSummaryPath(appId, dateYMD);
-      try {
-        const ref = await ensureSummaryDoc(db, path);
-        const listener = onSnapshot(ref, (snap) => {
-          if (!snap.exists()) return;
-          const d = snap.data();
-          const total = (d.in || 0) + (d.localin || 0) + (d.exitin || 0);
-          if (dayIndex === 1) day1Total = total;
-          else if (dayIndex === 2) day2Total = total;
-
-          updateState({
-            [`day${dayIndex}Visitors`]: total,
-            totalVisitors: day1Total + day2Total,
-          });
-        }, (error) => console.error(`Error listening Day ${dayIndex}:`, error));
-
-        return listener;
-      } catch (e) {
-        console.error(`Failed listener Day ${dayIndex}:`, e);
-        return null;
-      }
-    };
-
-    const setupDayListeners = async () => {
-      const dayDocRef = doc(db, getStaticDayPath(appId));
-      try {
-        const daySnap = await getDoc(dayDocRef);
-        if (daySnap.exists()) {
-          const data = daySnap.data();
-          const day1YMD = data.day1 ? toYMD_JST(data.day1).replace(/-/g, '') : null;
-          const day2YMD = data.day2 ? toYMD_JST(data.day2).replace(/-/g, '') : null;
-
-          updateState({
-            day1Date: data.day1 ? toMD_JST(data.day1) : initialHeaderData.day1Date,
-            day2Date: data.day2 ? toMD_JST(data.day2) : initialHeaderData.day2Date,
-          });
-
-          if (day1YMD) unsubscribeDay1 = await startDaySummaryListener(day1YMD, 1);
-          if (day2YMD) unsubscribeDay2 = await startDaySummaryListener(day2YMD, 2);
-        }
-      } catch (e) {
-        console.error("Failed fetch day static data:", e);
-      }
-    };
-
-    const startTodaySummaryListener = async () => {
-      const todayYMD = getJSTDateYMD().replace(/-/g, '');
-      const path = getSummaryPath(appId, todayYMD);
-
-      try {
-        const todayRef = await ensureSummaryDoc(db, path);
-        unsubscribeToday = onSnapshot(todayRef, (snap) => {
-          if (!snap.exists()) return;
-          const d = snap.data();
-          const inCount = d.in || 0;
-          const outCount = d.out || 0;
-          const localIn = d.localin || 0;
-          const exitIn = d.exitin || 0;
-
-          const current = inCount + localIn + exitIn - outCount;
-          const wait = (current / 100 * 5);
-          const waitTime = isNaN(wait) || current < 0 ? "--" : wait.toFixed(1);
-
-          updateState({
-            currentCount: current < 0 ? 0 : current,
-            localInCount: localIn,
-            exitInCount: exitIn,
-            waitTime: waitTime,
-          });
-
-          setIsDataLoading(false);
-        }, (error) => {
-          console.error("Error listening Today summary:", error);
-          setIsDataLoading(false);
-        });
-      } catch (e) {
-        console.error("Failed setup today listener:", e);
+        setHeaderData(prev => ({
+          ...prev,
+          currentCount: current < 0 ? 0 : current,
+          localInCount: d.localin || 0,
+          exitInCount: d.exitin || 0,
+          waitTime: waitTime,
+        }));
         setIsDataLoading(false);
-      }
-    };
+      }, error => {
+        console.error("Error listening Today summary:", error);
+        setIsDataLoading(false);
+      });
 
-    setupDayListeners();
-    startTodaySummaryListener();
+      return () => unsubscribe();
+    });
+  }, []);
 
-    return () => {
-      if (unsubscribeToday) unsubscribeToday();
-      if (unsubscribeDay1) unsubscribeDay1();
-      if (unsubscribeDay2) unsubscribeDay2();
-    };
-  }, [isFirebaseReady, db, appId, isAuthLoading]);
-
-  return [headerData, isDataLoading, userId, isAuthLoading];
+  return [headerData, isDataLoading, userId];
 };
