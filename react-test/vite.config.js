@@ -4,24 +4,17 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  root: '.',
-  build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: resolve(__dirname, 'index.html'),
-      // Firebase を外部化せずバンドル
-      external: [],
-    },
-    commonjsOptions: {
-      include: [/node_modules/],
-      extensions: ['.js', '.cjs'],
-    },
-  },
   optimizeDeps: {
     include: [
       'firebase/app',
       'firebase/auth',
-      'firebase/firestore', // ← ここを追加
+      'firebase/firestore' // ← ここを追加
     ],
+  },
+  build: {
+    rollupOptions: {
+      input: resolve(__dirname, 'index.html'),
+      external: [], // Firebase を外部化しない
+    },
   },
 });
