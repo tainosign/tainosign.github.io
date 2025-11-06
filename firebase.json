@@ -1,10 +1,6 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
   "hosting": {
-    "public": "dist",
+    "public": "react-test/dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -18,4 +14,3 @@
     ]
   }
 }
-
