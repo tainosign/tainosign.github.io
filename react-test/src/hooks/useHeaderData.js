@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-// ESM向け軽量モジュールに変更
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+// フル版 Firestore を ESM でインポート
+import { doc, getDoc, setDoc, onSnapshot, getFirestore } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { initializeFirebase, appId as globalAppId } from '../firebase/config';
 
@@ -54,9 +54,9 @@ export const useHeaderData = () => {
 
     const setupFirebaseAndAuth = async () => {
       try {
-        const { db, auth } = await initializeFirebase();
+        const { db: firestoreDb, auth } = await initializeFirebase();
         if (isMounted) {
-          setDb(db);
+          setDb(firestoreDb);
           setIsFirebaseReady(true);
         }
 
