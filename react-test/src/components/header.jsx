@@ -1,34 +1,9 @@
 import React from 'react';
 // appIdをconfigから直接インポート
-import { appId as globalAppId } from '../firebase/config'; 
+import QrImg from '../assets/images/qr.png';
 
-// ユーザーのリクエストに基づき、QRコード画像のパス/URLを定義します。
-// 実際のReact環境では、`import QrImg from '../assets/images/qr.png';`としてインポートされますが、
-// この環境では直接ファイルを参照できないため、視覚的な代替手段としてプレースホルダーURLを使用します。
-const QR_CODE_IMAGE_URL = '../assets/images/qr.png';
+const QrCodeImage = () => <img src={QrImg} alt="入場用QRコード" className="w-full h-full object-contain" />;
 
-
-/**
- * QRコード画像コンポーネント
- * ユーザーが指定したパスへの画像表示意図を反映
- */
-const QrCodeImage = () => (
-    <img 
-        src={QR_CODE_IMAGE_URL} 
-        alt="入場用QRコード" 
-        className="w-full h-full object-contain"
-    />
-);
-
-
-/**
- * Headerコンポーネント (header.htmlをReact/JSXで再現)
- * リアルタイムデータはPropsとして受け取る
- * @param {object} props 
- * @param {string | null} props.userId - 認証ユーザーID (親コンポーネントの認証フックから取得)
- * @param {boolean} props.isLoading - 認証またはデータ読み込み中フラグ (親コンポーネントでuseHeaderDataと認証状態を結合)
- * @param {object} props.data - useHeaderDataから取得した表示データ
- */
 export const Header = ({ userId, isLoading, data }) => {
     // configから直接appIdを取得
     const appId = globalAppId; 
