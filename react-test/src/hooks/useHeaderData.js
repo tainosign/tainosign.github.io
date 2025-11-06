@@ -1,8 +1,10 @@
+// useHeaderData.js
 import { useState, useEffect } from 'react';
-// フル版 Firestore を ESM でインポート
-import { doc, getDoc, setDoc, onSnapshot, getFirestore } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { initializeFirebase, appId as globalAppId } from '../firebase/config';
+
+// ESM で各機能だけ import
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 // JST ヘルパー関数
 import { getJSTDateYMD, toYMD_JST, toMD_JST } from '../utils/time';
