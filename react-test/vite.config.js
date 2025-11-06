@@ -9,7 +9,8 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
-      external: [], // 外部化は不要なら空
+      // Firebase を外部化せずバンドル
+      external: [],
     },
     commonjsOptions: {
       include: [/node_modules/],
@@ -20,7 +21,7 @@ export default defineConfig({
     include: [
       'firebase/app',
       'firebase/auth',
-      'firebase/firestore',
+      'firebase/firestore', // ← ここを追加
     ],
   },
 });
