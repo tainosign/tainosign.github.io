@@ -1,4 +1,7 @@
 import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } "firebase/app";
+import { getFirestore } "firebase/app";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAgLH9FWBCJy-X11vu0r3YS-VZC-B9M2xA",
@@ -11,4 +14,30 @@ const firebaseConfig = {
   measurementId: "G-70KHJ0P1P1"
 };
 
-export const app = initializeApp(firebaseConfig);
+// === Firebase 初期化 & 認証 ===
+export async function initializeFirebase(customToken = null) {
+  // ✅ 既存アプリがあれば再利用
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  await new Promise((resolve, reject) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      unsubscribe();
+      try {
+        if (!user) {
+          if (customToken) {
+            await signInWithCustomToken(auth, customToken);
+          } else {
+            await signInAnonymously(auth);
+          }
+        }
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    }, reject);
+  });
+
+  return { db, auth };
+}
