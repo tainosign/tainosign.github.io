@@ -21,6 +21,14 @@
       >
         🔴 出口カウンター
       </button>
+
+      <!-- 追加: シフト管理ボタン -->
+      <button
+        @click="$emit('selectView', 'shift')"
+        class="menu-link bg-blue-500 hover:bg-blue-700 text-white p-8 rounded-2xl text-2xl font-bold flex justify-center items-center h-24"
+      >
+        🟦 シフト管理
+      </button>
     </div>
   </div>
 </template>
