@@ -37,18 +37,19 @@
 </template>
 
 <script lang="ts">
-import HeaderContainer from './components/HeaderContainer.vue';
 import { defineComponent } from 'vue';
+import HeaderContainer from './components/HeaderContainer.vue';
+import MenuLink from './components/MenuLink.vue'; // ← 忘れずに！
 
 export default defineComponent({
   name: 'App',
   components: {
-    HeaderContainer,
-    MenuLink, // ← これを登録！
+    HeaderContainer: HeaderContainer,
+    MenuLink: MenuLink, // ← 明示的に書く（TSエラー回避）
   },
 });
-
 </script>
+
 
 <style>
 .main-content .menu-link {
