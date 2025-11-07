@@ -16,5 +16,16 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addComponents }) {
+      addComponents({
+        '.counter-button': {
+          '@apply select-none': {},
+          'touch-action': 'manipulation',
+          '-ms-touch-action': 'manipulation',
+          '-webkit-touch-callout': 'none',
+        }
+      })
+    }
+  ],
 };
