@@ -22,7 +22,7 @@ jobs:
         working-directory: vue-test
         run: |
           rm -rf node_modules dist
-          npm install
+          npm ci
           npm run build
 
       - name: 🔥 Firebase Hostingへデプロイ
