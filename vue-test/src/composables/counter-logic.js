@@ -1,5 +1,6 @@
 import { useFirebase } from "./useFirebase.js";
-import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "firebase/firestore";
 
 let db, auth, userId;
 
