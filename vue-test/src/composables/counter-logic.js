@@ -27,38 +27,38 @@ export async function setupCounter(appId) {
   auth = result.auth;
   userId = auth.currentUser?.uid || null;
 
-  setupRealtimeListener(appId);
-}
+  // グローバル関数も setupCounter 内で登録
+  window.logCount = async (type, count) => {
+    if (!db) {
+      console.warn("Firestore not ready yet");
+      return;
+    }
 
-export async function logCount(type, count, appId) {
-  if (!db) return;
+    const jstYMD = getJSTDateYMD();
+    const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
 
-  const jstYMD = getJSTDateYMD();
-  const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
-
-  const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
-  await addDoc(logRef, {
-    type,
-    count,
-    timestamp: new Date(timestamp),
-    event_day: jstYMD,
-    user_id: userId,
-  });
-
-  const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
-  const updateData = { updatedAt: new Date(timestamp) };
-  if (["in", "out", "localin", "exitin"].includes(type)) {
-    updateData[type] = increment(count);
-  }
-
-  await updateDoc(summaryRef, updateData).catch(async () => {
-    await setDoc(summaryRef, {
-      in: 0, out: 0, localin: 0, exitin: 0,
-      [type]: count,
-      updatedAt: new Date(timestamp),
+    // collection() はここで初めて呼ぶ → db は確実に初期化済み
+    const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
+    await addDoc(logRef, {
+      type,
+      count,
+      timestamp: new Date(timestamp),
+      event_day: jstYMD,
+      user_id: userId,
     });
-  });
-}
+
+    const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
+    const updateData = { updatedAt: new Date(timestamp) };
+    if (["in","out","localin","exitin"].includes(type)) updateData[type] = increment(count);
+
+    await updateDoc(summaryRef, updateData).catch(async () => {
+      await setDoc(summaryRef, {
+        in:0,out:0,localin:0,exitin:0,
+        [type]: count,
+        updatedAt: new Date(timestamp),
+      });
+    });
+  };
 
 function setupRealtimeListener(appId) {
   const jstYMD = getJSTDateYMD();
@@ -81,4 +81,5 @@ function setupRealtimeListener(appId) {
     if (localEl) localEl.textContent = localIn;
     if (exitEl) exitEl.textContent = exitIn;
   });
+}
 }
