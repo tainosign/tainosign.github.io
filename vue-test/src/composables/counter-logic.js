@@ -33,13 +33,12 @@ export async function setupCounter(appId) {
   // ✅ リアルタイム反映（現場表示用）
   setupRealtimeListener(appId);
 
-  // ✅ グローバル関数登録（ボタンから呼ばれる）
-window.logCount = async (type, count) => {
+export async function logCount(type, count, appId) {
   if (!db) return;
   const jstYMD = getJSTDateYMD();
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
 
-  // === ① 履歴ログを追加（完全履歴） ===
+  // 履歴ログを追加
   const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
   await addDoc(logRef, {
     type,
@@ -49,23 +48,20 @@ window.logCount = async (type, count) => {
     user_id: userId,
   });
 
-  // === ② summary を「JST日付」で管理 ===
+  // summary 更新
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
   const updateData = { updatedAt: new Date(timestamp) };
-
   if (["in", "out", "localin", "exitin"].includes(type)) {
     updateData[type] = increment(count);
   }
 
   await updateDoc(summaryRef, updateData).catch(async () => {
-    // ドキュメントが存在しない場合は作成
     await setDoc(summaryRef, {
       in: 0, out: 0, localin: 0, exitin: 0,
       [type]: count,
       updatedAt: new Date(timestamp),
     });
   });
-};
 }
 
 
