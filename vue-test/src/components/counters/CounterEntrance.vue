@@ -15,15 +15,11 @@ import { onMounted } from "vue";
 import CounterLayout from "@/components/layouts/CounterLayout.vue";
 import { setupCounter, logCount } from "@/composables/counter-logic.js";
 
-const ready = ref(false);
-
 onMounted(async () => {
   await setupCounter("setapanmarketcounter");
-  ready.value = true; // 初期化完了
 });
 
 function handleCount(type, value) {
-  if (!ready.value) return; // 初期化が終わるまで無効
   logCount(type, value, "setapanmarketcounter");
 }
 </script>
