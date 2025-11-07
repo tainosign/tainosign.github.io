@@ -12,7 +12,7 @@
 
 <script setup>
 import CounterLayout from "@/components/layouts/CounterLayout.vue";
-import { setupCounter, logCount } from "@/js/counter-logic.js";
+import { setupCounter, logCount } from "@/composables/counter-logic.js";
 await setupCounter("setapanmarketcounter");
 
 function handleCount(type, value) {
