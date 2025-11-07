@@ -21,6 +21,33 @@ export function toJSTStringFromFirestore(ts) {
   return date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
+// ✅ MM/DD形式
+export function toMD_JST(ts) {
+  if (!ts) return "--/--";
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  return date.toLocaleDateString("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Tokyo",
+  });
+}
+
+// ✅ YYYY-MM-DD形式
+export function toYMD_JST(ts) {
+  if (!ts) return "--/--/--";
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const jst = new Date(date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
+  const y = jst.getFullYear();
+  const m = String(jst.getMonth() + 1).padStart(2, "0");
+  const d = String(jst.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// ✅ Firestore用：JST基準のTimestamp生成
+export function firestoreTimestampJST() {
+  return new Date(nowJST());
+}
+
 // ✅ JST基準で「日付が変わったか」をチェック（集計リセットなどに利用）
 export function isNewJSTDay(prevTimestamp) {
   const prev = new Date(prevTimestamp);
