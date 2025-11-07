@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "react-test/dist",
+     "public": "vue-test/dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -14,3 +14,4 @@
     ]
   }
 }
+
