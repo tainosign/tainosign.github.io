@@ -11,7 +11,7 @@
 import Footer from "@/components/Footer.vue";
 </script>
 
-<style>
+<style scoped>
 html, body {
   touch-action: manipulation;
   -ms-touch-action: manipulation;
