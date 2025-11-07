@@ -1,6 +1,8 @@
 <template>
   <CounterLayout>
-    <div class="main-content flex flex-col items-center">
+
+    
+
         <div class="w-full max-w-xl flex flex-col gap-2 py-2">
 
             <!-- 🔴 -1（退場） -->
@@ -27,7 +29,7 @@
                 出口入場 +1
             </button>
         </div>
-    </div>
+
   </CounterLayout>
 </template>
 
