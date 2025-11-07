@@ -20,6 +20,6 @@ onMounted(async () => {
 });
 
 function handleCount(type, value) {
-  logCount(type, value, "setapanmarketcounter");
+  logCount(type, value);
 }
 </script>
