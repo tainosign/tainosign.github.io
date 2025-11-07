@@ -1,33 +1,34 @@
-<!-- src/components/shift/ShiftTeam.vue -->
 <template>
-  <div class="border rounded p-2 mr-2 flex-shrink-0" :style="{ minWidth: teamMinWidth + 'px' }">
-    <input type="text" v-model="team.name" class="border px-1 py-1 rounded w-full mb-1">
+  <ShiftItemWrapper
+    showAdd
+    addLabel="ポジション追加"
+    @copy="$emit('copy-team', team.id)"
+    @delete="$emit('delete-team', team.id)"
+    @add="$emit('add-position', team.id)"
+  >
+    <template #content>
+      <input type="text" v-model="team.name" class="border px-1 py-1 rounded w-full">
+    </template>
 
-    <div class="flex space-x-1 mb-2">
-      <button @click="$emit('copy-team', team.id)" class="bg-blue-500 text-white px-2 rounded">⇒</button>
-      <button @click="$emit('delete-team', team.id)" class="bg-red-500 text-white px-2 rounded">×</button>
+    <div class="flex space-x-2 mt-1">
+      <ShiftPosition
+        v-for="pos in team.positions"
+        :key="pos.id"
+        :position="pos"
+        @copy-position="$emit('copy-position', pos.id, team.id)"
+        @delete-position="$emit('delete-position', pos.id, team.id)"
+        @add-slot="$emit('add-slot', pos.id, team.id)"
+      />
     </div>
-
-    <div class="flex flex-col space-y-1">
-      <ShiftPosition v-for="pos in team.positions"
-                     :key="pos.id"
-                     :position="pos"
-                     @add-slot="$emit('add-slot', team.id, $event)" />
-    </div>
-
-    <button @click="$emit('add-position', team.id)" class="mt-2 bg-purple-500 text-white px-2 py-1 rounded text-sm">
-      ポジション追加
-    </button>
-  </div>
+  </ShiftItemWrapper>
 </template>
 
 <script setup>
-import ShiftPosition from './ShiftPosition.vue'
+import ShiftItemWrapper from "./ShiftItemWrapper.vue";
+import ShiftPosition from "./ShiftPosition.vue";
+import { defineProps } from "vue";
 
 const props = defineProps({
-  team: Object,
-  date: String
-})
-
-const teamMinWidth = 120
+  team: Object
+});
 </script>
