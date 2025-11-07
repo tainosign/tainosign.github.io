@@ -11,9 +11,13 @@
 </template>
 
 <script setup>
+import { onMounted } from "vue";
 import CounterLayout from "@/components/layouts/CounterLayout.vue";
 import { setupCounter, logCount } from "@/composables/counter-logic.js";
-await setupCounter("setapanmarketcounter");
+
+onMounted(async () => {
+  await setupCounter("setapanmarketcounter");
+});
 
 function handleCount(type, value) {
   logCount(type, value, "setapanmarketcounter");
