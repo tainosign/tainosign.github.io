@@ -1,41 +1,42 @@
-<!-- src/components/shift/ShiftDate.vue -->
 <template>
-  <div class="border rounded mb-4 p-2">
-    <div class="flex items-center justify-between mb-2">
-      <div>
+  <ShiftItemWrapper
+    showAdd
+    addLabel="チーム追加"
+    @copy="$emit('copy-date', date)"
+    @delete="$emit('delete-date', date)"
+    @add="$emit('add-team', date)"
+  >
+    <template #content>
+      <div class="flex items-center space-x-2">
         <span class="font-bold">{{ date }}</span>
-        <span class="text-sm text-gray-600">{{ shift.timeRange.start }}〜{{ shift.timeRange.end }}</span>
-        <input type="time" v-model="shift.timeRange.start" class="border px-1 py-1 rounded ml-2">
-        <input type="time" v-model="shift.timeRange.end" class="border px-1 py-1 rounded ml-1">
+        <span class="text-sm text-gray-600">{{ timeRange.start }}〜{{ timeRange.end }}</span>
       </div>
-      <button @click="$emit('delete-date', date)" class="bg-red-500 text-white px-2 rounded">×</button>
-    </div>
+    </template>
 
-    <!-- チーム列 -->
-    <div class="flex overflow-x-auto" :style="{ minWidth: shift.teams.length * teamMinWidth + 'px' }">
-      <ShiftTeam v-for="team in shift.teams"
-                 :key="team.id"
-                 :team="team"
-                 :date="date"
-                 @copy-team="$emit('copy-team', date, $event)"
-                 @delete-team="$emit('delete-team', date, $event)"
-                 @add-position="$emit('add-position', date, $event)" />
+    <div class="flex space-x-2 mt-1">
+      <ShiftTeam
+        v-for="team in teams"
+        :key="team.id"
+        :team="team"
+        @copy-team="$emit('copy-team', team.id, date)"
+        @delete-team="$emit('delete-team', team.id, date)"
+        @add-position="$emit('add-position', team.id, date)"
+        @copy-position="$emit('copy-position', $event, team.id, date)"
+        @delete-position="$emit('delete-position', $event, team.id, date)"
+        @add-slot="$emit('add-slot', $event, team.id, date)"
+      />
     </div>
-
-    <button @click="$emit('add-team', date)" class="mt-2 bg-green-500 text-white px-3 py-1 rounded">
-      チーム追加
-    </button>
-  </div>
+  </ShiftItemWrapper>
 </template>
 
 <script setup>
-import ShiftTeam from './ShiftTeam.vue'
-import { ref } from 'vue'
+import ShiftItemWrapper from "./ShiftItemWrapper.vue";
+import ShiftTeam from "./ShiftTeam.vue";
+import { defineProps } from "vue";
 
 const props = defineProps({
   date: String,
-  shift: Object
-})
-
-const teamMinWidth = 120
+  timeRange: Object,
+  teams: Array
+});
 </script>
