@@ -1,14 +1,14 @@
-name: Firebase Hosting 自動デプロイ (本番環境)
+name: Firebase Hosting 自動デプロイ (testブランチ)
 
 on:
   push:
     branches:
-      - test 
+      - test
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 🚀 コードのチェックアウト
         uses: actions/checkout@v4
@@ -24,6 +24,9 @@ jobs:
           rm -rf node_modules dist
           npm ci
           npm run build
+
+      - name: 📂 distフォルダを確認
+        run: ls -R vue-test/dist
 
       - name: 🔥 Firebase Hostingへデプロイ
         uses: FirebaseExtended/action-hosting-deploy@v0
