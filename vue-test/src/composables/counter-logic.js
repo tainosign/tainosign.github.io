@@ -21,7 +21,7 @@ function getJSTDateYMD() {
 }
 
 export async function setupCounter(appId) {
-  const result = await initializeFirebase();
+  const result = await useFirebase();
   db = result.db;
   auth = result.auth;
   userId = auth.currentUser?.uid || null;
