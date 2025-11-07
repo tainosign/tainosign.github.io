@@ -1,3 +1,4 @@
+// src/composables/counter-logic.js
 import { useFirebase } from "./useFirebase.js";
 import {
   collection,
@@ -7,7 +8,6 @@ import {
   updateDoc,
   increment,
   onSnapshot,
-  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let db, auth, userId;
@@ -18,27 +18,24 @@ function getJSTDateYMD() {
   const y = jst.getFullYear();
   const m = String(jst.getMonth() + 1).padStart(2, "0");
   const d = String(jst.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`; // 例: 2025-11-01
+  return `${y}-${m}-${d}`;
 }
 
-/**
- * カウンター初期化
- */
 export async function setupCounter(appId) {
   const result = await useFirebase();
   db = result.db;
   auth = result.auth;
   userId = auth.currentUser?.uid || null;
 
-  // ✅ リアルタイム反映（現場表示用）
   setupRealtimeListener(appId);
+}
 
 export async function logCount(type, count, appId) {
   if (!db) return;
+
   const jstYMD = getJSTDateYMD();
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
 
-  // 履歴ログを追加
   const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
   await addDoc(logRef, {
     type,
@@ -48,7 +45,6 @@ export async function logCount(type, count, appId) {
     user_id: userId,
   });
 
-  // summary 更新
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
   const updateData = { updatedAt: new Date(timestamp) };
   if (["in", "out", "localin", "exitin"].includes(type)) {
@@ -64,12 +60,6 @@ export async function logCount(type, count, appId) {
   });
 }
 
-
-
-/**
- * リアルタイム表示（画面内場内人数カウント）
- * summary方式でも従来方式でも動作
- */
 function setupRealtimeListener(appId) {
   const jstYMD = getJSTDateYMD();
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
@@ -83,7 +73,6 @@ function setupRealtimeListener(appId) {
     const exitIn = d.exitin || 0;
     const current = inCount + localIn + exitIn - outCount;
 
-    // ✅ 各要素を個別更新（header.htmlの構造を保つ）
     const currentEl = document.getElementById("current-count-value");
     const localEl = document.getElementById("localin-count");
     const exitEl = document.getElementById("exitin-count");
