@@ -15,9 +15,9 @@
 import { ref } from "vue";
 import Header from "@/components/Header.vue";
 import MainMenu from "@/components/MainMenu.vue";
-import CounterEntrance from "@/components/CounterEntrance.vue";
-import CounterLocal from "@/components/CounterLocal.vue";
-import CounterExit from "@/components/CounterExit.vue";
+import CounterEntrance from "@/components/counters/CounterEntrance.vue";
+import CounterLocal from "@/components/counters/CounterLocal.vue";
+import CounterExit from "@/components/counters/CounterExit.vue";
 
 const currentView = ref("menu");
 </script>
