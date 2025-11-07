@@ -24,7 +24,15 @@ export default {
           'touch-action': 'manipulation',
           '-ms-touch-action': 'manipulation',
           '-webkit-touch-callout': 'none',
-        }
+        },
+        '.large-counter-button': {
+          height: '32vh',
+          'min-height': '200px',
+        },
+        '.small-counter-button': {
+          height: '20vh',
+          'min-height': '120px',
+        },
       })
     }
   ],
