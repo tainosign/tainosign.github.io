@@ -6,7 +6,7 @@
       <slot /> <!-- 👈 各カウンター画面の中身がここに入る -->
     </main>
 
-    <Footer />
+    <Footer @back="$emit('back')" />
   </div>
 </template>
 
