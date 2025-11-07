@@ -1,4 +1,4 @@
-import { initializeFirebase } from "./useFirebase.js";
+import { useFirebase } from "./useFirebase.js";
 import {
   collection,
   addDoc,
