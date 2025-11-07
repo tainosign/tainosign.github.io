@@ -18,11 +18,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 📦 React依存関係のインストールとビルド
+      - name: 📦 依存関係のインストールとビルド
         working-directory: vue-test
         run: |
           rm -rf node_modules dist
-          npm ci
+          npm install
           npm run build
 
       - name: 🔥 Firebase Hostingへデプロイ
