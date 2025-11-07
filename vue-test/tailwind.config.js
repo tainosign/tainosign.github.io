@@ -1,5 +1,9 @@
-// tailwind-config.js
-tailwind.config = {
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
@@ -8,8 +12,9 @@ tailwind.config = {
         'yellow-report': '#ffc107',
         'cyan-view': '#17a2b8',
         'orange-calc': '#ff9800',
-        'blue-time':'#00aff0',        
-      }
-    }
-  }
+        'blue-time': '#00aff0',
+      },
+    },
+  },
+  plugins: [],
 };
