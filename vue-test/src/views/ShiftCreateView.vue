@@ -57,13 +57,14 @@
         チーム追加
       </button>
     </div>
+    <Footer @back="$emit('back')" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { shifts, addDate, addTeam, copyTeam, deleteTeam } from '@/composables/useShift.js'
-
+import Footer from "@/components/Footer.vue";
 // 最小幅
 const teamMinWidth = 120
 const slotMinWidth = 20
