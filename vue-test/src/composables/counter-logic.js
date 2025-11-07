@@ -1,14 +1,5 @@
-// src/composables/counter-logic.js
 import { useFirebase } from "./useFirebase.js";
-import {
-  collection,
-  addDoc,
-  doc,
-  setDoc,
-  updateDoc,
-  increment,
-  onSnapshot,
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let db, auth, userId;
 
@@ -27,59 +18,54 @@ export async function setupCounter(appId) {
   auth = result.auth;
   userId = auth.currentUser?.uid || null;
 
-  // グローバル関数も setupCounter 内で登録
-  window.logCount = async (type, count) => {
-    if (!db) {
-      console.warn("Firestore not ready yet");
-      return;
-    }
+  setupRealtimeListener(appId);
 
-    const jstYMD = getJSTDateYMD();
-    const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
+  // グローバル登録はしない
+}
 
-    // collection() はここで初めて呼ぶ → db は確実に初期化済み
-    const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
-    await addDoc(logRef, {
-      type,
-      count,
-      timestamp: new Date(timestamp),
-      event_day: jstYMD,
-      user_id: userId,
+export async function logCount(type, count, appId) {
+  if (!db) return; // db 未初期化なら無視
+
+  const jstYMD = getJSTDateYMD();
+  const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
+
+  const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
+  await addDoc(logRef, {
+    type,
+    count,
+    timestamp: new Date(timestamp),
+    event_day: jstYMD,
+    user_id: userId,
+  });
+
+  const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
+  const updateData = { updatedAt: new Date(timestamp) };
+  if (["in","out","localin","exitin"].includes(type)) updateData[type] = increment(count);
+
+  await updateDoc(summaryRef, updateData).catch(async () => {
+    await setDoc(summaryRef, {
+      in:0, out:0, localin:0, exitin:0,
+      [type]: count,
+      updatedAt: new Date(timestamp),
     });
-
-    const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
-    const updateData = { updatedAt: new Date(timestamp) };
-    if (["in","out","localin","exitin"].includes(type)) updateData[type] = increment(count);
-
-    await updateDoc(summaryRef, updateData).catch(async () => {
-      await setDoc(summaryRef, {
-        in:0,out:0,localin:0,exitin:0,
-        [type]: count,
-        updatedAt: new Date(timestamp),
-      });
-    });
-  };
+  });
+}
 
 function setupRealtimeListener(appId) {
+  if (!db) return;
   const jstYMD = getJSTDateYMD();
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
 
   onSnapshot(summaryRef, (snap) => {
     if (!snap.exists()) return;
     const d = snap.data();
-    const inCount = d.in || 0;
-    const outCount = d.out || 0;
-    const localIn = d.localin || 0;
-    const exitIn = d.exitin || 0;
-    const current = inCount + localIn + exitIn - outCount;
-
     const currentEl = document.getElementById("current-count-value");
     const localEl = document.getElementById("localin-count");
     const exitEl = document.getElementById("exitin-count");
 
+    const current = (d.in||0) + (d.localin||0) + (d.exitin||0) - (d.out||0);
     if (currentEl) currentEl.textContent = current;
-    if (localEl) localEl.textContent = localIn;
-    if (exitEl) exitEl.textContent = exitIn;
+    if (localEl) localEl.textContent = d.localin||0;
+    if (exitEl) exitEl.textContent = d.exitin||0;
   });
-}
 }
