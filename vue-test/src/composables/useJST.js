@@ -102,8 +102,3 @@ export function compareJSTDate(targetDate) {
   if (diff < 0 && diff > -1) return "yesterday";
   return diff > 0 ? "future" : "past";
 }
-
-// ✅ Firestore用：JST基準のTimestamp生成
-export function firestoreTimestampJST() {
-  return new Date(nowJST());
-}
