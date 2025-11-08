@@ -1,45 +1,41 @@
 <template>
-  <div class="p-4 space-y-4">
-<!-- 日付追加ボタン -->
-<button @click="addDate">日付追加</button>
+  <div class="p-4">
+    <!-- 日付追加ボタン -->
+    <div class="flex items-center gap-2 mb-4">
+      <button @click="addDate" class="bg-blue-500 text-white px-4 py-2 rounded">日付追加</button>
+    </div>
 
-<div class="flex flex-row gap-4 mt-4">
-  <ShiftDate
-    v-for="(date, index) in dates"
-    :key="date.id"
-    :date="date"
-    @remove="removeDate(date)"
-  />
-</div>
+    <!-- 日付コンポーネント横並び -->
+    <div class="flex flex-row gap-4 overflow-x-auto">
+      <ShiftDate
+        v-for="date in dates"
+        :key="date.id"
+        :date="date"
+        @removeDate="removeDate"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue"
-import draggable from "vuedraggable"
 import ShiftDate from "@/components/shift/ShiftDate.vue"
-  // vue-test/src/views/ShiftCreateView.vue の <script setup> 内
-import { getJSTDateString } from '@/composables/useJST.js'
+import { getJSTDateString } from "@/composables/useJST.js"
 
 const dates = ref([
-  { id: 1, value: getJSTDateString(), teams: [] }
-]);
+  { id: Date.now(), value: getJSTDateString(), teams: [] }
+])
 
 const addDate = () => {
-  const newDate = { id: Date.now(), value: '', teams: [] };
-  dates.value.push(newDate); // flex-row で横並び
-}
-const removeDate = (date) => {
-  dates.value = dates.value.filter(d => d.id !== date.id)
+  const newDate = {
+    id: Date.now(),
+    value: getJSTDateString(),
+    teams: []
+  }
+  dates.value.push(newDate)
 }
 
-const addTeam = (date) => {
-  date.teams.push({
-    id: Date.now(),
-    name: "新チーム",
-    positions: [],
-    locked: false,
-    folded: false
-  })
+const removeDate = (date) => {
+  dates.value = dates.value.filter(d => d.id !== date.id)
 }
 </script>
