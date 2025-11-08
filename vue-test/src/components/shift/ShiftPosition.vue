@@ -1,39 +1,36 @@
 <template>
-  <ShiftItemWrapper
-    :item="position"
-    :label="position.name"
-    :showDrag="true"
-    :showDuplicate="true"
-    :showRemove="true"
-    :showLock="true"
-    :foldedWidth="50"
-    @duplicate="$emit('duplicate', position)"
-    @remove="$emit('remove', position)"
-  >
-    <div class="flex flex-row gap-2 items-start">
-      <!-- スロット横並び -->
-      <ShiftSlot
-        v-for="slot in position.slots"
-        :key="slot.id"
-        :slot="slot"
-        @remove-member="$emit('remove-member', $event)"
-      />
+  <ShiftContainer :item="position" :list="positions">
+    <template #header>
+      <input v-model="position.name" class="border rounded p-1 text-sm w-20" />
+    </template>
 
-      <!-- スロット追加ボタン -->
-      <button
-        @click="$emit('add-slot', position)"
-        class="bg-yellow-500 text-white px-2 py-1 rounded text-sm self-start"
-      >
-        +スロット
-      </button>
-    </div>
-  </ShiftItemWrapper>
+    <template #body>
+      <div class="flex flex-row gap-2">
+        <ShiftSlot
+          v-for="slot in position.slots"
+          :key="slot.id"
+          :slot="slot"
+          :slots="position.slots"
+        />
+        <button @click="addSlot" class="bg-yellow-500 text-white text-xs px-2 py-1 rounded self-start mt-2">
+          ＋スロット
+        </button>
+      </div>
+    </template>
+  </ShiftContainer>
 </template>
 
 <script setup>
-import ShiftItemWrapper from "./ShiftItemWrapper.vue"
-import ShiftSlot from "./ShiftSlot.vue"
+import ShiftContainer from "./ShiftContainer.vue";
+import ShiftSlot from "./ShiftSlot.vue";
+import { createSlot } from "@/models/shiftModel";
 
-defineProps({ position: Object })
-defineEmits(["duplicate", "remove", "add-slot", "remove-member"])
+const props = defineProps({
+  position: Object,
+  positions: Array, // 親リスト
+});
+
+const addSlot = () => {
+  props.position.slots.push(createSlot());
+};
 </script>
