@@ -1,71 +1,50 @@
-<!-- src/components/shift/ShiftSlot.vue -->
 <template>
-  <div class="relative border-2 border-gray-400 rounded-lg bg-white p-2"
-       :style="{ height: slotHeight + 'px', width: '140px' }">
-    <!-- スロットヘッダ -->
-    <div class="flex justify-between items-center mb-1">
-      <span class="text-sm text-gray-700 font-semibold">{{ slot.name }}</span>
-      <button @click="$emit('remove')" class="text-red-500">×</button>
-    </div>
-
-    <!-- 時間目盛り -->
-    <div class="absolute left-0 top-6 w-4 flex flex-col items-end text-[10px] text-gray-500">
-      <template v-for="(tick, i) in tickMarks" :key="i">
-        <div
-          :style="{ height: tickHeight + 'px' }"
-          class="w-full border-t border-gray-300"
-        >
-          <span v-if="i % 6 === 0" class="pr-1">{{ i / 6 }}h</span>
+  <ShiftItemWrapper
+    :item="slot"
+    label="スロット"
+    @duplicate="$emit('duplicate', slot)"
+    @remove="$emit('remove', slot)"
+  >
+    <div class="flex">
+      <!-- 左：時間メモリ -->
+      <div class="w-12 border-r text-xs pr-1">
+        <div v-for="(t, i) in timeline" :key="i" class="h-4 flex items-center">
+          <span v-if="t.endsWith('00')">{{ t }}</span>
+          <span v-else class="opacity-30">─</span>
         </div>
-      </template>
-    </div>
+      </div>
 
-    <!-- メンバー縦並び -->
-    <div class="ml-6 flex flex-col gap-1 relative z-10">
-      <ShiftMember
-        v-for="(member, mIndex) in slot.members"
-        :key="member.id"
-        :member="member"
-        :display-mode="'slot'"
-        @remove="removeMember(mIndex)"
-      />
-      <button
-        @click="addMember"
-        class="bg-blue-400 text-white rounded text-sm py-1 hover:bg-blue-500"
-      >
-        ＋メンバー
-      </button>
+      <!-- 右：メンバー一覧 -->
+      <div class="flex-1 flex flex-col gap-1 ml-2">
+        <draggable
+          v-model="slot.members"
+          handle=".drag-handle"
+          item-key="id"
+        >
+          <template #item="{ element }">
+            <div class="border rounded bg-green-50 p-1 flex items-center justify-between">
+              <span>{{ element.name }}</span>
+              <button @click="$emit('remove-member', { slot, member: element })" class="text-red-500">×</button>
+            </div>
+          </template>
+        </draggable>
+      </div>
     </div>
-  </div>
+  </ShiftItemWrapper>
 </template>
 
 <script setup>
-import { computed } from "vue";
-import ShiftMember from "./ShiftMember.vue";
+import { ref } from "vue"
+import draggable from "vuedraggable"
+import ShiftItemWrapper from "./ShiftItemWrapper.vue"
 
-const props = defineProps({
-  slot: Object
-});
+defineProps({ slot: Object })
+defineEmits(["duplicate", "remove", "remove-member"])
 
-// 分単位の長さを高さに変換（例: 1分 = 1px）
-const slotHeight = computed(() => props.slot.duration);
-
-// 10分単位のメモリ
-const tickHeight = 10; // 10分 = 10px として表示
-const tickMarks = computed(() => {
-  const count = props.slot.duration / 10;
-  return Array.from({ length: count }, (_, i) => i);
-});
-
-// メンバー追加/削除
-const addMember = () => {
-  props.slot.members.push({
-    id: Date.now(),
-    name: `M${props.slot.members.length + 1}`,
-    role: "スタッフ",
-    start: "09:00",
-    end: "12:00",
-  });
-};
-const removeMember = (index) => props.slot.members.splice(index, 1);
+const timeline = ref([])
+for (let h = 9; h <= 17; h++) {
+  for (let m = 0; m < 60; m += 10) {
+    timeline.value.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+  }
+}
 </script>
