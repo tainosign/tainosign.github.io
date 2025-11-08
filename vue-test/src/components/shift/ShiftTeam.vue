@@ -1,68 +1,34 @@
 <template>
-  <ShiftItemWrapper
-    :item="team"
-    :label="team.name"
-    :showDrag="true"
-    @duplicate="$emit('duplicateTeam', team)"
-    @remove="$emit('removeTeam', team)"
-  >
-    <div class="flex flex-col gap-2">
-      <!-- ✅ チーム名編集 -->
-      <input v-model="team.name" class="border rounded p-1 text-sm w-32" />
+  <ShiftContainer :item="team" :list="teams">
+    <template #header>
+      <input v-model="team.name" class="border rounded p-1 text-sm" />
+    </template>
 
-      <!-- ✅ ポジション横並び -->
-      <div class="flex flex-row gap-2 overflow-x-auto">
-        <ShiftPosition
-          v-for="position in team.positions"
-          :key="position.id"
-          :position="position"
-          @add-slot="addSlot"
-          @duplicate="duplicatePosition"
-          @remove="removePosition"
-        />
-        <button
-          @click="addPosition"
-          class="bg-green-500 text-white px-2 py-1 rounded text-sm hover:bg-green-600"
-        >
-          ＋ポジション追加
-        </button>
-      </div>
-    </div>
-  </ShiftItemWrapper>
+    <template #body>
+      <ShiftPosition
+        v-for="pos in team.positions"
+        :key="pos.id"
+        :position="pos"
+        :positions="team.positions"
+      />
+      <button @click="addPosition" class="bg-blue-500 text-white text-xs px-2 py-1 mt-1 rounded">
+        ＋ポジション
+      </button>
+    </template>
+  </ShiftContainer>
 </template>
 
 <script setup>
-import ShiftItemWrapper from "./ShiftItemWrapper.vue"
-import ShiftPosition from "./ShiftPosition.vue"
+import ShiftContainer from "./ShiftContainer.vue";
+import ShiftPosition from "./ShiftPosition.vue";
+import { createPosition } from "@/models/shiftModel";
 
-const props = defineProps({ team: Object })
-const emit = defineEmits(["duplicateTeam", "removeTeam"])
+const props = defineProps({
+  team: Object,
+  teams: Array,
+});
 
 const addPosition = () => {
-  if (!props.team.positions) props.team.positions = []
-  props.team.positions.push({
-    id: Date.now(),
-    name: `ポジ${props.team.positions.length + 1}`,
-    slots: []
-  })
-}
-
-const duplicatePosition = (position) => {
-  const copy = JSON.parse(JSON.stringify(position))
-  copy.id = Date.now()
-  props.team.positions.push(copy)
-}
-
-const removePosition = (position) => {
-  props.team.positions = props.team.positions.filter(p => p.id !== position.id)
-}
-
-const addSlot = (position) => {
-  position.slots.push({
-    id: Date.now(),
-    start: "09:00",
-    end: "17:00",
-    members: []
-  })
-}
+  props.team.positions.push(createPosition());
+};
 </script>
