@@ -1,48 +1,34 @@
 <template>
-  <ShiftItemWrapper
-    :item="position"
-    :label="position.name"
-    @duplicate="$emit('duplicate', position)"
-    @remove="$emit('remove', position)"
-  >
-    <div class="flex flex-col gap-2">
-      <!-- ✅ ポジション名編集 -->
-      <input v-model="position.name" class="border rounded p-1 text-sm w-28" />
+  <ShiftContainer :item="position" :list="positions">
+    <template #header>
+      <input v-model="position.name" class="border rounded p-1 text-sm" />
+    </template>
 
-      <div class="flex flex-row gap-2">
-        <button @click="addSlot(position)" class="bg-yellow-500 text-white rounded px-2 py-1 text-sm">
-          ＋スロット追加
-        </button>
-
-        <draggable
-          v-model="position.slots"
-          handle=".drag-handle"
-          item-key="id"
-          class="flex flex-row gap-2 overflow-x-auto"
-        >
-          <template #item="{ element }">
-            <ShiftSlot :slot="element" />
-          </template>
-        </draggable>
+    <template #body>
+      <div v-for="slot in position.slots" :key="slot.id" class="border rounded p-2 mb-1 bg-gray-50">
+        <div class="flex justify-between items-center mb-1">
+          <span>{{ slot.start }} - {{ slot.end }}</span>
+          <button @click="addMember(slot)" class="text-xs bg-blue-200 px-2 rounded">＋メンバー</button>
+        </div>
+        <div class="flex flex-wrap gap-1">
+          <ShiftMember v-for="m in slot.members" :key="m.id" :member="m" />
+        </div>
       </div>
-    </div>
-  </ShiftItemWrapper>
+    </template>
+  </ShiftContainer>
 </template>
 
 <script setup>
-import draggable from "vuedraggable"
-import ShiftSlot from "./ShiftSlot.vue"
-import ShiftItemWrapper from "./ShiftItemWrapper.vue"
+import ShiftContainer from "./ShiftContainer.vue";
+import ShiftMember from "./ShiftMember.vue";
+import { createMember } from "@/models/shiftModel";
 
-defineProps({ position: Object })
-defineEmits(["duplicate", "remove", "add-slot"])
+const props = defineProps({
+  position: Object,
+  positions: Array,
+});
 
-const addSlot = (position) => {
-  position.slots.push({
-    id: Date.now(),
-    start: "09:00",
-    end: "17:00",
-    members: []
-  })
-}
+const addMember = (slot) => {
+  slot.members.push(createMember());
+};
 </script>
