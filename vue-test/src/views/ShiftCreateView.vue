@@ -1,16 +1,16 @@
 <template>
   <div class="p-4 space-y-4">
-    <button @click="addDate" class="bg-indigo-500 text-white px-4 py-2 rounded">＋ 日付追加</button>
+<!-- 日付追加ボタン -->
+<button @click="addDate">日付追加</button>
 
-    <draggable v-model="dates" handle=".drag-handle" item-key="id" class="space-y-4">
-      <template #item="{ element }">
-        <ShiftDate
-          :date="element"
-          @remove="removeDate(element.id)"
-          @add-team="addTeam"
-        />
-      </template>
-    </draggable>
+<div class="flex flex-row gap-4 mt-4">
+  <ShiftDate
+    v-for="(date, index) in dates"
+    :key="date.id"
+    :date="date"
+    @remove="removeDate(date)"
+  />
+</div>
   </div>
 </template>
 
@@ -19,20 +19,16 @@ import { ref } from "vue"
 import draggable from "vuedraggable"
 import ShiftDate from "@/components/shift/ShiftDate.vue"
 
-const dates = ref([])
+const dates = ref([
+  { id: 1, value: getJSTDateString(), teams: [] }
+]);
 
 const addDate = () => {
-  dates.value.push({
-    id: Date.now(),
-    date: new Date().toISOString().slice(0, 10),
-    teams: [],
-    locked: false,
-    folded: false
-  })
+  const newDate = { id: Date.now(), value: '', teams: [] };
+  dates.value.push(newDate); // flex-row で横並び
 }
-
-const removeDate = (id) => {
-  dates.value = dates.value.filter(d => d.id !== id)
+const removeDate = (date) => {
+  dates.value = dates.value.filter(d => d.id !== date.id)
 }
 
 const addTeam = (date) => {
