@@ -15,11 +15,12 @@
       </button>
     </div>
 
-    <!-- ✅ 追加された日付コンポーネント（横並び） -->
+    <!-- ✅ 横並びで日付コンポーネントを表示 -->
     <div class="flex flex-row gap-4 overflow-x-auto">
       <ShiftDate
         v-for="dateItem in dates"
         :key="dateItem.id"
+        v-model="dateItem.date"
         :dateItem="dateItem"
         @duplicateDate="duplicateDate"
         @removeDate="removeDate"
@@ -33,10 +34,10 @@ import { ref } from "vue"
 import ShiftDate from "@/components/shift/ShiftDate.vue"
 import { getJSTDateString } from "@/composables/useJST.js"
 
-// ✅ 現在日付（JST）を初期値として設定
+// ✅ 初期値：今日（日本時間）
 const selectedDate = ref(getJSTDateString())
 
-// 日付配列
+// ✅ 登録済みの日付コンポーネント
 const dates = ref([])
 
 // ✅ 日付追加
@@ -56,9 +57,12 @@ const removeDate = (item) => {
   dates.value = dates.value.filter((d) => d.id !== item.id)
 }
 
-// ✅ 日付複製
+// ✅ 日付複製（＋1日）
 const duplicateDate = (item) => {
   const copy = JSON.parse(JSON.stringify(item))
+  const newDate = new Date(item.date)
+  newDate.setDate(newDate.getDate() + 1) // ✅ 1日加算
+  copy.date = newDate.toISOString().slice(0, 10)
   copy.id = Date.now()
   dates.value.push(copy)
 }
