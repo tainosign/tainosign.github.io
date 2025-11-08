@@ -10,7 +10,7 @@
 <script setup>
 import { ref } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
-import { getJSTDateString } from "@/utils/date"; // 任意
+import { getJSTDateString } from "@/composables/useJST.js"; // 任意
 
 const store = useShiftStore();
 const selectedDate = ref(new Date().toISOString().split("T")[0]);
