@@ -1,12 +1,13 @@
 <template>
   <ShiftContainer :item="slot" :list="slots">
+    <!-- ヘッダー：スロット名編集 -->
     <template #header>
       <input v-model="slot.name" class="border rounded p-1 text-sm w-20" />
     </template>
 
     <template #body>
       <div class="flex">
-        <!-- 時間メモリ -->
+        <!-- 左：時間メモリ -->
         <div class="w-12 border-r text-xs pr-1">
           <div v-for="t in timeline" :key="t" class="h-4 flex items-center">
             <span v-if="t.endsWith('00')">{{ t }}</span>
@@ -14,7 +15,7 @@
           </div>
         </div>
 
-        <!-- メンバー一覧 -->
+        <!-- 右：メンバー一覧 -->
         <div class="flex-1 flex flex-col gap-1 ml-2">
           <draggable v-model="slot.members" group="members" item-key="id" handle=".drag-handle">
             <template #item="{ element }">
@@ -23,7 +24,8 @@
           </draggable>
         </div>
       </div>
-    </ShiftContainer>
+    </template>
+  </ShiftContainer>
 </template>
 
 <script setup>
@@ -34,7 +36,7 @@ import ShiftMember from "./ShiftMember.vue";
 
 const props = defineProps({
   slot: Object,
-  slots: Array,
+  slots: Array, // 親リスト
 });
 
 // タイムライン 6:00〜20:00
