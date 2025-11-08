@@ -1,34 +1,39 @@
 <template>
-  <ShiftContainer :item="position" :list="positions">
-    <template #header>
-      <input v-model="position.name" class="border rounded p-1 text-sm" />
-    </template>
+  <ShiftItemWrapper
+    :item="position"
+    :label="position.name"
+    :showDrag="true"
+    :showDuplicate="true"
+    :showRemove="true"
+    :showLock="true"
+    :foldedWidth="50"
+    @duplicate="$emit('duplicate', position)"
+    @remove="$emit('remove', position)"
+  >
+    <div class="flex flex-row gap-2 items-start">
+      <!-- スロット横並び -->
+      <ShiftSlot
+        v-for="slot in position.slots"
+        :key="slot.id"
+        :slot="slot"
+        @remove-member="$emit('remove-member', $event)"
+      />
 
-    <template #body>
-      <div v-for="slot in position.slots" :key="slot.id" class="border rounded p-2 mb-1 bg-gray-50">
-        <div class="flex justify-between items-center mb-1">
-          <span>{{ slot.start }} - {{ slot.end }}</span>
-          <button @click="addMember(slot)" class="text-xs bg-blue-200 px-2 rounded">＋メンバー</button>
-        </div>
-        <div class="flex flex-wrap gap-1">
-          <ShiftMember v-for="m in slot.members" :key="m.id" :member="m" />
-        </div>
-      </div>
-    </template>
-  </ShiftContainer>
+      <!-- スロット追加ボタン -->
+      <button
+        @click="$emit('add-slot', position)"
+        class="bg-yellow-500 text-white px-2 py-1 rounded text-sm self-start"
+      >
+        +スロット
+      </button>
+    </div>
+  </ShiftItemWrapper>
 </template>
 
 <script setup>
-import ShiftContainer from "./ShiftContainer.vue";
-import ShiftMember from "./ShiftMember.vue";
-import { createMember } from "@/models/shiftModel";
+import ShiftItemWrapper from "./ShiftItemWrapper.vue"
+import ShiftSlot from "./ShiftSlot.vue"
 
-const props = defineProps({
-  position: Object,
-  positions: Array,
-});
-
-const addMember = (slot) => {
-  slot.members.push(createMember());
-};
+defineProps({ position: Object })
+defineEmits(["duplicate", "remove", "add-slot", "remove-member"])
 </script>
