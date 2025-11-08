@@ -18,6 +18,8 @@
 import { ref } from "vue"
 import draggable from "vuedraggable"
 import ShiftDate from "@/components/shift/ShiftDate.vue"
+  // vue-test/src/views/ShiftCreateView.vue の <script setup> 内
+import { getJSTDateString } from '@/composables/useJST.js'
 
 const dates = ref([
   { id: 1, value: getJSTDateString(), teams: [] }
