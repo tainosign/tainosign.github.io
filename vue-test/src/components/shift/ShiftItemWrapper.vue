@@ -1,37 +1,46 @@
+<!-- vue-test/src/components/shift/ShiftItemWrapper.vue -->
 <template>
-  <div :class="['border rounded p-2', borderClass]" :style="styleObj">
-    <div class="flex items-center justify-between mb-1">
-      <slot name="content" />
-      <div class="flex space-x-1">
-        <button v-if="showCopy" @click="onCopy" class="bg-blue-500 text-white px-2 rounded">⇒</button>
-        <button v-if="showDelete" @click="onDelete" class="bg-red-500 text-white px-2 rounded">×</button>
-      </div>
+  <div
+    class="relative border-2 border-gray-500 rounded-md bg-white shadow-sm p-2"
+    :class="{ 'opacity-60': item.locked }"
+  >
+    <!-- ヘッダー部 -->
+    <div class="flex items-center gap-2 mb-2">
+      <span class="cursor-pointer font-bold">{{ label }}</span>
+
+      <button @click="$emit('duplicate', item)" class="text-blue-500 font-bold">⇒</button>
+      <button @click="$emit('remove', item)" class="text-red-500 font-bold">×</button>
+      <span class="drag-handle cursor-move text-gray-700 font-bold">⋯</span>
+      <button @click="toggleLock">{{ item.locked ? '●' : '◯' }}</button>
+      <button @click="toggleFold">{{ item.folded ? '▶' : '◀' }}</button>
     </div>
 
-    <slot /> <!-- 子コンテンツ（チームやポジションなど） -->
-
-    <button v-if="showAdd" @click="onAdd"
-            class="mt-2 bg-green-500 text-white px-2 py-1 rounded text-sm w-full">
-      {{ addLabel }}
-    </button>
+    <!-- 折りたたみ可能な中身 -->
+    <transition name="fade">
+      <div v-show="!item.folded">
+        <slot></slot>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from "vue";
-
 const props = defineProps({
-  showCopy: { type: Boolean, default: true },
-  showDelete: { type: Boolean, default: true },
-  showAdd: { type: Boolean, default: false },
-  addLabel: { type: String, default: "追加" },
-  borderClass: { type: String, default: "border-gray-700" },
-  styleObj: { type: Object, default: () => ({}) }
-});
+  item: Object,
+  label: String
+})
 
-const emit = defineEmits(["copy", "delete", "add"]);
+const emit = defineEmits(["duplicate", "remove"])
 
-function onCopy() { emit("copy") }
-function onDelete() { emit("delete") }
-function onAdd() { emit("add") }
+const toggleLock = () => (props.item.locked = !props.item.locked)
+const toggleFold = () => (props.item.folded = !props.item.folded)
 </script>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+</style>
