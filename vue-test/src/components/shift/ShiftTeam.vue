@@ -1,34 +1,64 @@
 <template>
-  <ShiftContainer :item="team" :list="teams">
-    <template #header>
-      <input v-model="team.name" class="border rounded p-1 text-sm" />
-    </template>
-
-    <template #body>
+  <ShiftItemWrapper
+    :item="team"
+    :label="team.name"
+    :showDrag="true"
+    :showDuplicate="true"
+    :showRemove="true"
+    :showLock="true"
+    :foldedWidth="50"
+    @duplicate="$emit('duplicateTeam', team)"
+    @remove="$emit('removeTeam', team)"
+  >
+    <div class="flex flex-row gap-4">
+      <!-- ポジション横並び -->
       <ShiftPosition
-        v-for="pos in team.positions"
-        :key="pos.id"
-        :position="pos"
-        :positions="team.positions"
+        v-for="position in team.positions"
+        :key="position.id"
+        :position="position"
+        @duplicate="$emit('duplicatePosition', position)"
+        @remove="$emit('removePosition', position)"
+        @add-slot="addSlot"
       />
-      <button @click="addPosition" class="bg-blue-500 text-white text-xs px-2 py-1 mt-1 rounded">
-        ＋ポジション
+
+      <!-- ポジション追加ボタン -->
+      <button @click="addPosition" class="bg-green-500 text-white px-2 py-1 rounded text-sm self-start">
+        ポジション追加
       </button>
-    </template>
-  </ShiftContainer>
+    </div>
+  </ShiftItemWrapper>
 </template>
 
 <script setup>
-import ShiftContainer from "./ShiftContainer.vue";
-import ShiftPosition from "./ShiftPosition.vue";
-import { createPosition } from "@/models/shiftModel";
+import ShiftItemWrapper from "./ShiftItemWrapper.vue"
+import ShiftPosition from "./ShiftPosition.vue"
 
 const props = defineProps({
-  team: Object,
-  teams: Array,
-});
+  team: Object
+})
+const emit = defineEmits(["duplicateTeam", "removeTeam", "duplicatePosition", "removePosition", "add-slot"])
 
 const addPosition = () => {
-  props.team.positions.push(createPosition());
-};
+  if (!props.team.positions) props.team.positions = []
+  props.team.positions.push({
+    id: Date.now(),
+    name: `ポジ${props.team.positions.length + 1}`,
+    slots: [],
+    locked: false,
+    folded: false
+  })
+}
+
+// ポジション配下にスロット追加
+const addSlot = (position) => {
+  if (!position.slots) position.slots = []
+  position.slots.push({
+    id: Date.now(),
+    start: "09:00",
+    end: "18:00",
+    members: [],
+    locked: false,
+    folded: false
+  })
+}
 </script>
