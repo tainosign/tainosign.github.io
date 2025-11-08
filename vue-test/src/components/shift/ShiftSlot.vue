@@ -1,69 +1,37 @@
-<template>
-  <ShiftContainer :item="slot" :list="slots" :foldedWidth="computeFoldedWidth">
-    <template #header>
-      <input v-model="slot.name" class="border rounded p-1 text-sm w-20" />
-    </template>
+<ShiftContainer
+  :item="slot"
+  :list="slots"
+  :foldedWidth="computeFoldedWidth"
+>
+  <template #header>
+    <input v-model="slot.name" class="border rounded p-1 text-sm w-20" />
+  </template>
 
-    <template #body>
-      <div class="flex">
-        <!-- 左：時間メモリ -->
-        <div v-if="!slot.folded" class="w-12 border-r text-xs pr-1">
-          <div v-for="t in timeline" :key="t" class="h-4 flex items-center">
-            <span v-if="t.endsWith('00')">{{ t }}</span>
-            <span v-else class="opacity-30">─</span>
+  <template #body>
+    <div class="flex items-center h-6">
+      <template v-if="!slot.folded">
+        <!-- 通常表示：縦に展開 -->
+        ...
+      </template>
+
+      <template v-else>
+        <!-- 折りたたみ時：横長表示、縦は潰さない -->
+        <div
+          class="flex items-center h-6 overflow-hidden bg-blue-100 text-xs px-1 gap-1"
+        >
+          <span class="text-gray-600">{{ slot.start }}〜{{ slot.end }}</span>
+          <div class="flex gap-0.5 ml-1">
+            <template v-for="member in slot.members" :key="member.id">
+              <div
+                class="bg-green-400 text-white text-[0.55rem] rounded px-0.5"
+                :title="member.name"
+              >
+                {{ member.name[0] }}
+              </div>
+            </template>
           </div>
         </div>
-
-        <!-- メンバー一覧 -->
-        <div v-if="!slot.folded" class="flex-1 flex flex-col gap-1 ml-2">
-          <draggable v-model="slot.members" group="members" item-key="id" handle=".drag-handle">
-            <template #item="{ element }">
-              <ShiftMember :member="element" />
-            </template>
-          </draggable>
-        </div>
-
-        <!-- 折りたたみ時の簡易表示 -->
-        <div v-else class="h-6 bg-blue-100 text-xs flex items-center justify-center">
-          {{ slot.start }}〜{{ slot.end }}
-        </div>
-      </div>
-    </template>
+      </template>
+    </div>
+  </template>
 </ShiftContainer>
-</template>
-
-<script setup>
-import { computed } from "vue";
-import draggable from "vuedraggable";
-import ShiftContainer from "./ShiftContainer.vue";
-import ShiftMember from "./ShiftMember.vue";
-
-const props = defineProps({
-  slot: Object,
-  slots: Array
-});
-
-// タイムライン 6:00〜20:00
-const timeline = computed(() => {
-  const list = [];
-  for (let t = 6 * 60; t <= 20 * 60; t += 10) {
-    const h = String(Math.floor(t / 60)).padStart(2, "0");
-    const m = String(t % 60).padStart(2, "0");
-    list.push(`${h}:${m}`);
-  }
-  return list;
-});
-
-// 折りたたみ時の幅を時間幅に応じて計算
-const computeFoldedWidth = computed(() => {
-  const startMin = parseTime(props.slot.start);
-  const endMin = parseTime(props.slot.end);
-  const ratio = (endMin - startMin) / (14 * 60); // 6:00〜20:00が100%
-  return Math.max(50, ratio * 400); // 最小50px, 最大400px
-});
-
-function parseTime(str) {
-  const [h, m] = str.split(":").map(Number);
-  return h * 60 + m;
-}
-</script>
