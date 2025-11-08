@@ -1,79 +1,48 @@
 <template>
-  <ShiftItemWrapper
-    :item="dateItem"
-    :label="formattedDate"
-    @duplicate="$emit('duplicateDate', dateItem)"
-    @remove="$emit('removeDate', dateItem)"
-  >
-    <!-- チーム追加ボタン -->
-    <div class="mb-2">
-      <button
-        @click="addTeam"
-        class="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 text-sm"
-      >
-        チーム追加
-      </button>
+  <div class="border-2 border-gray-600 rounded-md p-3 bg-white shadow-sm min-w-[220px]">
+    <!-- ✅ 日付行 -->
+    <div class="flex items-center gap-2 mb-2">
+      <input
+        type="date"
+        v-model="dateItem.date"
+        class="border rounded p-1 text-sm"
+      />
+      <button @click="$emit('duplicateDate', dateItem)" class="text-blue-500 font-bold">⇒</button>
+      <button @click="$emit('removeDate', dateItem)" class="text-red-500 font-bold">×</button>
     </div>
 
-    <!-- 横並びのチーム -->
-    <div class="flex flex-row gap-2 overflow-x-auto">
+    <!-- ✅ チーム一覧 -->
+    <div class="flex flex-col gap-2">
       <ShiftTeam
         v-for="team in dateItem.teams"
         :key="team.id"
         :team="team"
-        @duplicateTeam="duplicateTeam"
-        @removeTeam="removeTeam"
       />
+      <button
+        @click="addTeam"
+        class="bg-green-500 text-white px-2 py-1 rounded text-sm hover:bg-green-600"
+      >
+        ＋チーム追加
+      </button>
     </div>
-  </ShiftItemWrapper>
+  </div>
 </template>
 
 <script setup>
-import ShiftItemWrapper from "@/components/shift/ShiftItemWrapper.vue"
-import ShiftTeam from "@/components/shift/ShiftTeam.vue"
-import { computed } from "vue"
+import ShiftTeam from "./ShiftTeam.vue"
 
 const props = defineProps({
   dateItem: Object
-})
-const emit = defineEmits(["duplicateDate", "removeDate"])
-
-// 日付のフォーマット（例：2025-11-08 → 2025/11/08）
-const formattedDate = computed(() => {
-  if (!props.dateItem.date) return "日付未設定"
-  const d = new Date(props.dateItem.date)
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(
-    d.getDate()
-  ).padStart(2, "0")}`
 })
 
 // ✅ チーム追加
 const addTeam = () => {
   props.dateItem.teams.push({
     id: Date.now(),
-    name: `チーム${props.dateItem.teams.length + 1}`,
+    name: "新チーム",
     locked: false,
     folded: false,
     positions: []
   })
 }
-
-// ✅ チーム削除
-const removeTeam = (team) => {
-  props.dateItem.teams = props.dateItem.teams.filter((t) => t.id !== team.id)
-}
-
-// ✅ チーム複製
-const duplicateTeam = (team) => {
-  const copy = JSON.parse(JSON.stringify(team))
-  copy.id = Date.now()
-  props.dateItem.teams.push(copy)
-}
 </script>
-
-<style scoped>
-.flex-row {
-  display: flex;
-  flex-direction: row;
-}
-</style>
