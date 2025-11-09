@@ -1,5 +1,3 @@
-// 統一データモデル定義
-
 export function createMember(name = "新メンバー") {
   return { id: crypto.randomUUID(), name, role: "" };
 }
@@ -7,6 +5,7 @@ export function createMember(name = "新メンバー") {
 export function createSlot() {
   return {
     id: crypto.randomUUID(),
+    name: "新スロット",
     start: "09:00",
     end: "18:00",
     members: [],
