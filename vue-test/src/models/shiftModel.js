@@ -1,5 +1,13 @@
-export function createMember(name = "新メンバー") {
-  return { id: crypto.randomUUID(), name, role: "" };
+// src/models/shiftModel.js
+export function createMember(name = "新メンバー", teamId = null) {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    role: "",
+    teamId,           // 所属チーム
+    assigned: false,  // シフト割り当て有無
+    resting: false,   // 休憩中状態
+  };
 }
 
 export function createSlot() {
@@ -8,7 +16,7 @@ export function createSlot() {
     name: "新スロット",
     start: "09:00",
     end: "18:00",
-    members: [],
+    members: [], // createMember() の id のみを格納
     locked: false,
     folded: false,
   };
@@ -24,10 +32,10 @@ export function createPosition() {
   };
 }
 
-export function createTeam() {
+export function createTeam(name = "新チーム") {
   return {
     id: crypto.randomUUID(),
-    name: "新チーム",
+    name,
     positions: [createPosition()],
     locked: false,
     folded: false,
@@ -39,5 +47,6 @@ export function createShift(dateStr) {
     id: crypto.randomUUID(),
     date: dateStr,
     teams: [createTeam()],
+    members: [], // ここで全メンバー一覧も管理
   };
 }
