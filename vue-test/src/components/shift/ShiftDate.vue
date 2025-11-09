@@ -9,14 +9,14 @@
     </template>
 
     <template #body>
-      <div class="flex flex-row gap-4">
+      <ScrollableRow>
         <ShiftTeam
           v-for="team in shift.teams"
           :key="team.id"
           :team="team"
           :teams="shift.teams"
         />
-      </div>
+      </ScrollableRow>
     </template>
   </ShiftContainer>
 </template>
@@ -24,6 +24,7 @@
 <script setup>
 import ShiftContainer from "./ShiftContainer.vue";
 import ShiftTeam from "./ShiftTeam.vue";
+import ScrollableRow from "../common/ScrollableRow.vue";
 import { createTeam } from "@/models/shiftModel";
 
 const props = defineProps({
