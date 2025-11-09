@@ -39,20 +39,23 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { useMemberStore } from "@/stores/memberStore";
+import { mockShiftData } from "@/mocks/mockShiftData";
 
 const showPanel = ref(false);
 const filterStatus = ref("unassigned");
-const store = useMemberStore();
+
+// 🔹 ここでモックデータを直接ロード
+const shift = mockShiftData();
 
 const togglePanel = () => {
   showPanel.value = !showPanel.value;
 };
 
+// 🔹 ここで shift.members を利用
 const filteredMembers = computed(() => {
-  return store.members.filter((m) => {
-    if (filterStatus.value === "unassigned") return !m.assigned;
-    if (filterStatus.value === "assigned") return m.assigned;
+  return shift.members.filter((m) => {
+    if (filterStatus.value === "unassigned") return !m.teamId;
+    if (filterStatus.value === "assigned") return m.teamId;
     if (filterStatus.value === "resting") return m.resting;
     return true;
   });
