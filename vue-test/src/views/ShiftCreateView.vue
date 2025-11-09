@@ -26,7 +26,7 @@ import { useShiftStore } from "@/stores/shiftStore";
 import ShiftDate from "@/components/shift/ShiftDate.vue";
 import ShiftToolbar from "@/components/shift/ShiftToolbar.vue";
 import ScrollableRow from "@/components/common/ScrollableRow.vue";
-import MemberPanelToggle from "@/components/shiftMemberPanelToggle.vue"; // ←ここを追加！
+import MemberPanelToggle from "@/components/shift/MemberPanelToggle.vue"; // ←ここを追加！
 
 const store = useShiftStore();
 </script>
