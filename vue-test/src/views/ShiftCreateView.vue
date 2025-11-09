@@ -4,9 +4,14 @@
 
     <ShiftToolbar />
 
-    <div class="flex flex-wrap gap-4">
-      <ShiftDate v-for="shift in store.shifts" :key="shift.id" :shift="shift" :shifts="store.shifts" />
-    </div>
+    <ScrollableRow>
+      <ShiftDate
+        v-for="shift in store.shifts"
+        :key="shift.id"
+        :shift="shift"
+        :shifts="store.shifts"
+      />
+    </ScrollableRow>
   </div>
 </template>
 
@@ -14,6 +19,7 @@
 import { useShiftStore } from "@/stores/shiftStore";
 import ShiftDate from "@/components/shift/ShiftDate.vue";
 import ShiftToolbar from "@/components/shift/ShiftToolbar.vue";
+import ScrollableRow from "@/components/common/ScrollableRow.vue";
 
 const store = useShiftStore();
 </script>
