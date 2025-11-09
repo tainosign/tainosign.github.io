@@ -1,5 +1,3 @@
-import { reactive } from "vue";
-
 export function useShiftItem(item) {
   const toggleLock = () => (item.locked = !item.locked);
   const toggleFold = () => (item.folded = !item.folded);
