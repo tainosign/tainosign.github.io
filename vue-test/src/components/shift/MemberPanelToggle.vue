@@ -1,9 +1,12 @@
 <template>
-  <div class="fixed right-2 top-1/2 transform -translate-y-1/2 z-50">
-    <!-- タグボタン -->
+  <div
+    class="fixed top-1/2 transform -translate-y-1/2 z-50 flex items-center transition-all duration-300"
+    :class="{ 'right-[25%]': showPanel, 'right-2': !showPanel }"
+  >
+    <!-- 縦書きのメンバーボタン -->
     <button
-      @click="showPanel = !showPanel"
-      class="bg-blue-500 text-white px-3 py-2 rounded shadow"
+      @click="togglePanel"
+      class="bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical"
     >
       メンバー
     </button>
@@ -12,7 +15,7 @@
     <transition name="slide">
       <div
         v-if="showPanel"
-        class="fixed right-0 top-0 h-full w-1/5 bg-white border-l p-3 shadow-lg overflow-y-auto"
+        class="fixed right-0 top-0 h-screen w-[25%] bg-white border-l p-3 shadow-lg overflow-y-auto"
       >
         <div class="flex justify-between items-center mb-2">
           <button @click="autoAssign" class="bg-green-500 text-white px-2 py-1 rounded">
@@ -25,8 +28,9 @@
           </select>
         </div>
 
-        <div v-for="m in filteredMembers" :key="m.id" class="border rounded p-1 mb-1">
-          {{ m.name }} <span class="text-xs text-gray-500">({{ m.team || "未配置" }})</span>
+        <div v-for="m in filteredMembers" :key="m.id" class="border rounded p-2 mb-2 shadow-sm">
+          <div class="font-semibold">{{ m.name }}</div>
+          <div class="text-xs text-gray-500">{{ m.team || "未配置" }}</div>
         </div>
       </div>
     </transition>
@@ -41,8 +45,12 @@ const showPanel = ref(false);
 const filterStatus = ref("unassigned");
 const store = useMemberStore();
 
+const togglePanel = () => {
+  showPanel.value = !showPanel.value;
+};
+
 const filteredMembers = computed(() => {
-  return store.members.filter(m => {
+  return store.members.filter((m) => {
     if (filterStatus.value === "unassigned") return !m.assigned;
     if (filterStatus.value === "assigned") return m.assigned;
     if (filterStatus.value === "resting") return m.resting;
@@ -56,11 +64,21 @@ const autoAssign = () => {
 </script>
 
 <style scoped>
+/* ボタン縦書き */
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.2em;
+}
+
+/* スライドアニメーション */
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s ease;
 }
-.slide-enter-from,
+.slide-enter-from {
+  transform: translateX(100%);
+}
 .slide-leave-to {
   transform: translateX(100%);
 }
