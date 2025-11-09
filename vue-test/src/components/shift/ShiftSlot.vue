@@ -1,8 +1,5 @@
 <template>
-  <ShiftContainer
-    :item="slot"
-    :list="slots"
-  >
+  <ShiftContainer :item="slot" :list="slots">
     <template #header>
       <input
         v-model="slot.name"
@@ -12,9 +9,8 @@
     </template>
 
     <template #body>
-      <!-- スロット本体：縦方向に時間を持つ -->
+      <!-- スロット本体（縦方向に時間軸） -->
       <div class="relative border h-[840px] bg-gray-50 overflow-hidden rounded">
-        <!-- 時間目盛り -->
         <div
           v-for="(t, i) in timeLabels"
           :key="i"
@@ -24,9 +20,8 @@
           <span class="absolute left-1 -top-2">{{ t }}</span>
         </div>
 
-        <!-- ここに後でメンバーコンポーネントを配置予定 -->
         <div class="absolute inset-0">
-          <!-- 例：<ShiftMember ... /> を将来配置 -->
+          <!-- 将来 ShiftMember コンポーネントをここに配置予定 -->
         </div>
       </div>
     </template>
@@ -42,7 +37,7 @@ const props = defineProps({
   slots: Array,
 });
 
-// 時間ラベル（6:00〜20:00まで1時間ごと）
+// 6:00〜20:00 までの時間軸
 const timeLabels = computed(() => {
   const times = [];
   for (let h = 6; h <= 20; h++) {
