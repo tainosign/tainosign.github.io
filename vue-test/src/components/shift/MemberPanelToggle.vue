@@ -1,22 +1,23 @@
 <template>
-  <div
-    class="fixed top-1/2 transform -translate-y-1/2 z-50 flex items-center transition-all duration-300"
-    :class="{ 'right-[25%]': showPanel, 'right-2': !showPanel }"
+<div
+  class="fixed top-1/2 transform -translate-y-1/2 z-50 flex items-center transition-all duration-300"
+  :class="{ 'right-1/3': showPanel, 'right-2': !showPanel }"
+>
+  <!-- メンバーボタン -->
+  <button
+    @click="togglePanel"
+    class="bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical"
   >
-    <!-- 縦書きのメンバーボタン -->
-    <button
-      @click="togglePanel"
-      class="bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical"
-    >
-      メンバー
-    </button>
+    メンバー
+  </button>
 
-    <!-- パネル -->
-    <transition name="slide">
-      <div
-        v-if="showPanel"
-        class="fixed right-0 top-0 h-screen w-[25%] bg-white border-l p-3 shadow-lg overflow-y-auto"
-      >
+  <!-- パネル -->
+  <transition name="slide">
+    <div
+      v-if="showPanel"
+      class="fixed right-0 top-0 bottom-0 w-1/3 max-w-[400px] bg-white border-l p-3 shadow-lg overflow-y-auto"
+    >
+      <!-- パネル内コンテンツ -->
         <div class="flex justify-between items-center mb-2">
           <button @click="autoAssign" class="bg-green-500 text-white px-2 py-1 rounded">
             自動配置
