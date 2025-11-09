@@ -11,7 +11,7 @@
         </slot>
       </template>
 
-      <div class="flex gap-1">
+      <div class="flex gap-1 items-center">
         <!-- 折りたたみトグルは常に表示 -->
         <button
           @click="toggleFold"
@@ -21,33 +21,40 @@
         </button>
 
         <!-- 折りたたまれていないときだけ他ボタン表示 -->
-        <template v-if="!item.folded">
-          <button
-            @click="toggleLock"
-            class="text-xs bg-gray-100 px-2 py-1 rounded"
-          >
-            {{ item.locked ? "🔒" : "🔓" }}
-          </button>
-          <button
-            @click="duplicate(list)"
-            class="text-xs bg-gray-100 px-2 py-1 rounded"
-          >
-            📄
-          </button>
-          <button
-            @click="remove(list)"
-            class="text-xs bg-red-100 px-2 py-1 rounded"
-          >
-            ✖
-          </button>
-        </template>
+        <transition name="fade">
+          <template v-if="!item.folded">
+            <button
+              @click="toggleLock"
+              class="text-xs bg-gray-100 px-2 py-1 rounded"
+            >
+              {{ item.locked ? "🔒" : "🔓" }}
+            </button>
+            <button
+              @click="duplicate(list)"
+              class="text-xs bg-gray-100 px-2 py-1 rounded"
+            >
+              📄
+            </button>
+            <button
+              @click="remove(list)"
+              class="text-xs bg-red-100 px-2 py-1 rounded"
+            >
+              ✖
+            </button>
+          </template>
+        </transition>
       </div>
     </div>
 
     <!-- body部分 -->
-    <div v-show="!item.folded" class="mt-2">
-      <slot name="body"></slot>
-    </div>
+    <transition name="collapse">
+      <div
+        class="mt-2 transition-all duration-300"
+        :style="bodyStyle"
+      >
+        <slot name="body"></slot>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -60,20 +67,48 @@ const props = defineProps({
   list: Array,
 });
 
-// 折りたたみ制御関数
 const { toggleLock, toggleFold, duplicate, remove } = useShiftItem(props.item);
 
 // 横幅だけ細長くするスタイル
 const foldedStyle = computed(() => {
   if (!props.item.folded) {
-    return { width: "100%" };
+    return {
+      width: "100%",
+      transition: "width 0.3s ease",
+    };
   }
   return {
     width: "80px",
-    height: "auto",
     transition: "width 0.3s ease",
-    overflowX: "hidden",
-    overflowY: "visible",
+  };
+});
+
+// 縦方向のbodyエリアは非表示にせず、高さだけ変化させる
+const bodyStyle = computed(() => {
+  if (!props.item.folded) {
+    return {
+      maxHeight: "500px",
+      opacity: "1",
+    };
+  }
+  return {
+    maxHeight: "0",
+    opacity: "0",
+    overflow: "hidden",
   };
 });
 </script>
+
+<style scoped>
+/* フェードとスライドアニメーション */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.collapse-enter-active, .collapse-leave-active {
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+</style>
