@@ -1,41 +1,36 @@
 <template>
-<div
-  class="fixed top-1/2 transform -translate-y-1/2 z-50 flex items-center transition-all duration-300"
-  :class="{ 'right-1/3': showPanel, 'right-2': !showPanel }"
->
-  <!-- メンバーボタン -->
+  <!-- ボタン固定 -->
   <button
     @click="togglePanel"
-    class="bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical"
+    class="fixed top-1/2 right-2 transform -translate-y-1/2 bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical transition-all duration-300"
+    :class="{ 'right-1/3': showPanel }"
   >
     メンバー
   </button>
 
-  <!-- パネル -->
+  <!-- パネル固定 -->
   <transition name="slide">
     <div
       v-if="showPanel"
-      class="fixed right-0 top-0 bottom-0 w-1/3 max-w-[400px] bg-white border-l p-3 shadow-lg overflow-y-auto"
+      class="fixed top-0 bottom-0 right-0 w-1/3 max-w-[400px] bg-white border-l p-3 shadow-lg overflow-y-auto"
     >
-      <!-- パネル内コンテンツ -->
-        <div class="flex justify-between items-center mb-2">
-          <button @click="autoAssign" class="bg-green-500 text-white px-2 py-1 rounded">
-            自動配置
-          </button>
-          <select v-model="filterStatus" class="border rounded p-1 text-sm">
-            <option value="unassigned">未配置</option>
-            <option value="assigned">配置済み</option>
-            <option value="resting">休憩中</option>
-          </select>
-        </div>
-
-        <div v-for="m in filteredMembers" :key="m.id" class="border rounded p-2 mb-2 shadow-sm">
-          <div class="font-semibold">{{ m.name }}</div>
-          <div class="text-xs text-gray-500">{{ m.team || "未配置" }}</div>
-        </div>
+      <div class="flex justify-between items-center mb-2">
+        <button @click="autoAssign" class="bg-green-500 text-white px-2 py-1 rounded">
+          自動配置
+        </button>
+        <select v-model="filterStatus" class="border rounded p-1 text-sm">
+          <option value="unassigned">未配置</option>
+          <option value="assigned">配置済み</option>
+          <option value="resting">休憩中</option>
+        </select>
       </div>
-    </transition>
-  </div>
+
+      <div v-for="m in filteredMembers" :key="m.id" class="border rounded p-2 mb-2 shadow-sm">
+        <div class="font-semibold">{{ m.name }}</div>
+        <div class="text-xs text-gray-500">{{ m.team || "未配置" }}</div>
+      </div>
+    </div>
+  </transition>
 </template>
 
 <script setup>
