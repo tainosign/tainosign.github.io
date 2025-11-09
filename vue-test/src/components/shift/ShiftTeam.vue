@@ -2,6 +2,9 @@
   <ShiftContainer :item="team" :list="teams">
     <template #header>
       <input v-model="team.name" class="border rounded p-1 text-sm w-24" />
+      <button @click="addPosition" class="bg-blue-500 text-white text-xs px-2 py-1 rounded self-start mt-2">
+          ＋ポジション
+      </button>
     </template>
 
     <template #body>
@@ -12,9 +15,6 @@
           :position="position"
           :positions="team.positions"
         />
-        <button @click="addPosition" class="bg-blue-500 text-white text-xs px-2 py-1 rounded self-start mt-2">
-          ＋ポジション
-        </button>
       </div>
     </template>
   </ShiftContainer>
