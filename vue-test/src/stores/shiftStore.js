@@ -7,31 +7,25 @@ import { useFirestoreMembers } from "@/composables/useFirestoreMembers.js";
 export const useShiftStore = defineStore("shiftStore", () => {
   const shifts = ref([]);
   const members = ref([]);
-  const isLoading = ref(true);
+  const isLoading = ref(false);
+  const isInitialized = ref(false);
 
   let unsubscribeShifts = null;
   let unsubscribeMembers = null;
 
-  const {
-    addShift,
-    getShifts,
-    updateShift,
-    addSlotToShift,
-    syncShifts,
-  } = useFirestoreShifts();
-
-  const {
-    addMember,
-    getMembers,
-    updateMember,
-    deleteMember,
-    syncMembers,
-  } = useFirestoreMembers();
+  // Firestore 操作用 composable を取得
+  const { addShift, getShifts, updateShift, addSlotToShift, syncShifts } =
+    useFirestoreShifts();
+  const { addMember, getMembers, updateMember, deleteMember, syncMembers } =
+    useFirestoreMembers();
 
   // =========================
-  // 初期化処理
+  // 初期化（リアルタイム同期）
   // =========================
   const init = async () => {
+    if (isInitialized.value) return; // 既に初期化済みならスキップ
+    isInitialized.value = true;
+
     try {
       console.log("🌀 shiftStore 初期化開始...");
       isLoading.value = true;
@@ -41,10 +35,10 @@ export const useShiftStore = defineStore("shiftStore", () => {
       members.value = await getMembers();
 
       // リアルタイム同期開始
-      unsubscribeShifts = await syncShifts((data) => {
+      unsubscribeShifts = syncShifts((data) => {
         shifts.value = data;
       });
-      unsubscribeMembers = await syncMembers((data) => {
+      unsubscribeMembers = syncMembers((data) => {
         members.value = data;
       });
 
@@ -67,6 +61,9 @@ export const useShiftStore = defineStore("shiftStore", () => {
 
   onUnmounted(cleanup);
 
+  // =========================
+  // エクスポート
+  // =========================
   return {
     shifts,
     members,
@@ -77,6 +74,6 @@ export const useShiftStore = defineStore("shiftStore", () => {
     addMember,
     updateMember,
     deleteMember,
-    init,
+    init, // ← initRealtimeSync ではなく init に統一
   };
 });
