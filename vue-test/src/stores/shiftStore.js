@@ -9,82 +9,46 @@ export const useShiftStore = defineStore("shift", () => {
   const members = ref([]);
   const isLoading = ref(false);
 
-  // Firestore操作オブジェクト（非同期初期化）
-  let firestoreShifts = null;
-  let firestoreMembers = null;
+  // Firestore 操作
+  const { addShift, getShifts, updateShift, addSlotToShift, syncShifts } = useFirestoreShifts();
+  const { addMember, getMembers, updateMember, deleteMember, syncMembers } = useFirestoreMembers();
 
-  // ====== 初期化 ======
-  const init = async () => {
+  // 初期化・リアルタイム同期
+  const initRealtimeSync = async () => {
     isLoading.value = true;
-
-    firestoreShifts = await useFirestoreShifts();
-    firestoreMembers = await useFirestoreMembers();
-
-    // リアルタイム同期
-    firestoreShifts.syncShifts((data) => (shifts.value = data));
-    firestoreMembers.syncMembers((data) => (members.value = data));
-
-    isLoading.value = false;
+    try {
+      await syncShifts((data) => (shifts.value = data));
+      await syncMembers((data) => (members.value = data));
+    } catch (e) {
+      console.error("Realtime sync error:", e);
+    } finally {
+      isLoading.value = false;
+    }
   };
 
-  // ====== シフト操作 ======
+  // シフト操作
   const addNewShift = async (dateStr) => {
-    if (!firestoreShifts) await init();
-    await firestoreShifts.addShift({ date: dateStr, slots: [] });
+    const newShift = { date: dateStr, slots: [] };
+    await addShift(newShift);
   };
 
+  // メンバー操作
   const assignMemberToSlot = async (memberId, slotId, teamId, positionId) => {
-    if (!firestoreMembers) await init();
-    const member = members.value.find((m) => m.id === memberId);
+    const member = members.value.find(m => m.id === memberId);
     if (!member) return;
-
     member.status = "配置済み";
     member.teamId = teamId;
     member.positionId = positionId;
     member.shiftIds.push(slotId);
-
-    await firestoreMembers.updateMember(member.id, member);
-  };
-
-  const unassignMemberFromSlot = async (memberId, slotId) => {
-    if (!firestoreMembers) await init();
-    const member = members.value.find((m) => m.id === memberId);
-    if (!member) return;
-
-    member.status = "未配置";
-    member.shiftIds = member.shiftIds.filter((id) => id !== slotId);
-    member.teamId = null;
-    member.positionId = null;
-
-    await firestoreMembers.updateMember(member.id, member);
-  };
-
-  // ====== メンバー操作 ======
-  const addNewMember = async (data) => {
-    if (!firestoreMembers) await init();
-    return await firestoreMembers.addMember(data);
-  };
-
-  const removeMember = async (id) => {
-    if (!firestoreMembers) await init();
-    await firestoreMembers.deleteMember(id);
+    await updateMember(member.id, member);
   };
 
   return {
     shifts,
     members,
     isLoading,
-
-    // 初期化
-    init,
-
-    // シフト操作
+    initRealtimeSync,
     addNewShift,
     assignMemberToSlot,
-    unassignMemberFromSlot,
-
-    // メンバー操作
-    addNewMember,
-    removeMember,
   };
 });
