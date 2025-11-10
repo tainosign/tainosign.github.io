@@ -6,9 +6,9 @@ export function mockShiftData() {
 
   // メンバーを追加
   shift.members = [
-    createMember("佐藤", shift.teams[0].id),
-    createMember("田中", shift.teams[0].id),
-    createMember("鈴木", null),
+    createMemberModel("佐藤", shift.teams[0].id),
+    createMemberModel("田中", shift.teams[0].id),
+    createMemberModel("鈴木", null),
   ];
 
   // Aチーム1番目のポジションのスロットに割り当て
