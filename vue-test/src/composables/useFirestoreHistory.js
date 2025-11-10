@@ -4,7 +4,7 @@ import { createHistoryModel } from "../models/shiftModel.js";
 
 export async function useFirestoreHistory() {
   const { db } = await useFirebase();
-  const colRef = collection(db, "history");
+  const colRef = collection(db, "artifacts/setapanmarketcounter/public/data/shifts");
 
   const addHistory = async (type, targetId, detail) => {
     const history = createHistoryModel({ type, targetId, detail });
