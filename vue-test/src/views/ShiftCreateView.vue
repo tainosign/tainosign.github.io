@@ -1,45 +1,98 @@
-<!-- vue-test/src/views/ShiftCreateView.vue -->
+<!-- src/views/ShiftCreateView.vue -->
 <template>
-  <div class="relative p-4 h-screen overflow-hidden">
-    <h2 class="text-xl font-bold mb-3">シフト作成</h2>
+  <div class="p-4">
+    <h2 class="text-xl font-bold mb-3">シフト作成（複数日対応）</h2>
 
-    <!-- ローディング表示 -->
-    <div v-if="store.isLoading" class="text-gray-500">読み込み中...</div>
+    <!-- 日付選択 -->
+    <div class="mb-3">
+      <label class="block mb-1 font-semibold">📅 日付を選択（複数選択可）</label>
+      <div class="flex flex-wrap gap-2">
+        <input
+          type="date"
+          v-for="(d, index) in selectedDates"
+          :key="index"
+          v-model="selectedDates[index]"
+          class="border p-1 rounded"
+        />
+        <button
+          @click="addDateField"
+          class="bg-gray-300 px-2 py-1 rounded"
+        >＋日付追加</button>
+      </div>
+    </div>
 
-    <!-- ツールバー -->
-    <ShiftToolbar v-else />
+    <!-- 読み込み・保存ボタン -->
+    <div class="mb-3">
+      <button
+        @click="loadShifts"
+        class="bg-blue-500 text-white px-3 py-1 rounded mr-2"
+        :disabled="store.isLoading"
+      >選択日付のシフトを読み込み</button>
 
-    <!-- シフト全体 -->
-    <ScrollableRow v-if="!store.isLoading">
-      <ShiftDate
-        v-for="shift in store.shifts"
-        :key="shift.id"
-        :shift="shift"
-        :shifts="store.shifts"
-      />
-    </ScrollableRow>
+      <button
+        @click="saveShifts"
+        class="bg-green-500 text-white px-3 py-1 rounded"
+        :disabled="store.isLoading || loadedShifts.length === 0"
+      >選択日付のシフトを保存</button>
+    </div>
 
-    <!-- メンバーパネルとトグルボタン -->
-    <MemberPanelToggle v-if="!store.isLoading" />
+    <!-- 読み込んだシフト表示 -->
+    <div v-if="loadedShifts.length > 0">
+      <h3 class="font-semibold mb-2">📋 読み込んだシフト</h3>
+      <ScrollableRow>
+        <ShiftDate
+          v-for="shift in loadedShifts"
+          :key="shift.id"
+          :shift="shift"
+        />
+      </ScrollableRow>
+    </div>
+
+    <div v-else class="text-gray-500">まだシフトは読み込まれていません。</div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { ref } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import ShiftDate from "@/components/shift/ShiftDate.vue";
-import ShiftToolbar from "@/components/shift/ShiftToolbar.vue";
 import ScrollableRow from "@/components/common/ScrollableRow.vue";
-import MemberPanelToggle from "@/components/shift/MemberPanelToggle.vue";
 
 const store = useShiftStore();
+const selectedDates = ref([new Date().toISOString().slice(0, 10)]);
+const loadedShifts = ref([]);
 
-// 画面描画時に Firestore からシフトとメンバーを取得
-onMounted(async () => {
+// 日付フィールド追加
+const addDateField = () => {
+  selectedDates.value.push("");
+};
+
+// シフト読み込み
+const loadShifts = async () => {
+  store.isLoading = true;
   try {
-    await store.init(); // ← initRealtimeSync() ではなく init() に変更
+    const data = await store.getShiftsByDates(selectedDates.value);
+    loadedShifts.value = data;
   } catch (e) {
-    console.error("シフト初期化エラー:", e);
+    console.error("シフト読み込みエラー:", e);
+  } finally {
+    store.isLoading = false;
   }
-});
+};
+
+// シフト保存
+const saveShifts = async () => {
+  store.isLoading = true;
+  try {
+    await store.saveShiftsByDates(loadedShifts.value);
+    alert("✅ 選択日付のシフトを保存しました");
+  } catch (e) {
+    console.error("シフト保存エラー:", e);
+  } finally {
+    store.isLoading = false;
+  }
+};
+
+// 初期化
+store.init();
 </script>
