@@ -1,64 +1,81 @@
-// src/composables/useFirestoreShifts.js
-import { useFirebase } from "@/composables/useFirebase.js";
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
-import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
+// src/stores/shiftStore.js
+import { defineStore } from "pinia";
+import { ref, onUnmounted } from "vue";
+import { useFirestoreShifts } from "@/composables/useFirestoreShifts.js";
+import { useFirestoreMembers } from "@/composables/useFirestoreMembers.js";
 
-export function useFirestoreShifts() {
-  const initColRef = async () => {
-    const { db } = await useFirebase();
-    return collection(db, "shifts");
+export const useShiftStore = defineStore("shiftStore", () => {
+  const shifts = ref([]);
+  const members = ref([]);
+
+  let unsubscribeShifts = null;
+  let unsubscribeMembers = null;
+
+  // Firestore 操作用の composable を初期化
+  const {
+    addShift,
+    getShifts,
+    updateShift,
+    addSlotToShift,
+    syncShifts,
+  } = useFirestoreShifts();
+
+  const {
+    addMember,
+    getMembers,
+    updateMember,
+    deleteMember,
+    syncMembers,
+  } = useFirestoreMembers();
+
+  // =========================
+  // 初期化（リアルタイム同期）
+  // =========================
+  const init = async () => {
+    try {
+      console.log("🌀 shiftStore 初期化開始...");
+
+      // Firestoreから初期データ取得
+      shifts.value = await getShifts();
+      members.value = await getMembers();
+
+      // リアルタイム同期開始
+      unsubscribeShifts = await syncShifts((data) => {
+        shifts.value = data;
+      });
+      unsubscribeMembers = await syncMembers((data) => {
+        members.value = data;
+      });
+
+      console.log("✅ shiftStore: 初期化完了");
+    } catch (err) {
+      console.error("❌ shiftStore 初期化エラー:", err);
+    }
   };
 
-  // -------------------
-  // データ操作
-  // -------------------
-  const addShift = async (data) => {
-    const colRef = await initColRef();
-    const shift = createShiftModel(data);
-    await setDoc(doc(colRef, shift.id), shift);
-    return shift;
+  // =========================
+  // クリーンアップ
+  // =========================
+  const cleanup = () => {
+    if (unsubscribeShifts) unsubscribeShifts();
+    if (unsubscribeMembers) unsubscribeMembers();
+    console.log("🧹 shiftStore: Firestoreリスナー解除");
   };
 
-  const getShifts = async () => {
-    const colRef = await initColRef();
-    const snap = await getDocs(colRef);
-    return snap.docs.map((d) => d.data());
-  };
+  onUnmounted(cleanup);
 
-  const updateShift = async (id, updates) => {
-    const colRef = await initColRef();
-    await updateDoc(doc(colRef, id), { ...updates, updated_at: new Date() });
+  // =========================
+  // エクスポート
+  // =========================
+  return {
+    shifts,
+    members,
+    addShift,
+    updateShift,
+    addSlotToShift,
+    addMember,
+    updateMember,
+    deleteMember,
+    init, // ← 名前をinitRealtimeSyncからinitに統一
   };
-
-  const addSlotToShift = async (shiftId, slotData) => {
-    const colRef = await initColRef();
-    const slot = createSlotModel(slotData);
-    const ref = doc(colRef, shiftId);
-    const snap = await getDoc(ref);
-    const shift = snap.data();
-    const updatedSlots = [...(shift.slots || []), slot];
-    await updateDoc(ref, { slots: updatedSlots, updated_at: new Date() });
-    return slot;
-  };
-
-  // -------------------
-  // リアルタイム監視
-  // -------------------
-  const syncShifts = async (callback) => {
-    const colRef = await initColRef();
-    return onSnapshot(colRef, (snapshot) => {
-      const data = snapshot.docs.map((d) => d.data());
-      callback(data);
-    });
-  };
-
-  return { addShift, getShifts, updateShift, addSlotToShift, syncShifts };
-}
+});
