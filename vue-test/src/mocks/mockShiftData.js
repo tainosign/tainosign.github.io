@@ -2,7 +2,7 @@
 import { createShiftModel, createMemberModel } from "@/models/shiftModel";
 
 export function mockShiftData() {
-  const shift = createShift("2025-11-10");
+  const shift = createShiftModel("2025-11-10");
 
   // メンバーを追加
   shift.members = [
