@@ -9,13 +9,12 @@
     </template>
 
     <template #body>
-      <!-- スロット本体 -->
       <div
         class="relative border h-[840px] bg-gray-50 overflow-hidden rounded"
         @dragover.prevent
         @drop="handleDrop"
       >
-        <!-- 時間ラベル -->
+        <!-- 時間目盛 -->
         <div
           v-for="(t, i) in timeLabels"
           :key="i"
@@ -25,7 +24,7 @@
           <span class="absolute left-1 -top-2">{{ t }}</span>
         </div>
 
-        <!-- メンバーカードを配置 -->
+        <!-- メンバー描画 -->
         <div
           v-for="m in localMembers"
           :key="m.id"
@@ -33,7 +32,6 @@
           :style="{
             top: `${m.top}px`,
             height: `${m.height}px`,
-            transition: 'top 0.2s',
           }"
         >
           <div class="font-semibold">{{ m.name_kanji }}</div>
@@ -47,34 +45,29 @@
 <script setup>
 import { ref, computed } from "vue";
 import ShiftContainer from "./ShiftContainer.vue";
+import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
   slot: Object,
   slots: Array,
 });
 
-// ローカルメンバー状態（ドロップ後に反映）
+const shiftStore = useShiftStore();
 const localMembers = ref([]);
 
-// 時間ラベル（6:00〜20:00）
 const timeLabels = computed(() => {
-  const times = [];
-  for (let h = 6; h <= 20; h++) {
-    times.push(`${String(h).padStart(2, "0")}:00`);
-  }
-  return times;
+  const arr = [];
+  for (let h = 6; h <= 20; h++) arr.push(`${String(h).padStart(2, "0")}:00`);
+  return arr;
 });
 
-// 10分単位のピクセル換算（840px ÷ (14h × 6 = 84区間) = 10pxごとに10分）
 const pixelsPer10Min = 840 / (14 * 6);
 
-// ドロップ処理
 function handleDrop(e) {
   const rect = e.currentTarget.getBoundingClientRect();
   const y = e.clientY - rect.top;
-
   const member = JSON.parse(e.dataTransfer.getData("application/json"));
-  const startMinutes = Math.floor(y / pixelsPer10Min) * 10 + 6 * 60; // 6:00基準
+  const startMinutes = Math.floor(y / pixelsPer10Min) * 10 + 6 * 60;
   const hours = Math.floor(startMinutes / 60);
   const minutes = startMinutes % 60;
   const startTime = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
@@ -82,13 +75,12 @@ function handleDrop(e) {
   const newMember = {
     ...member,
     top: y,
-    height: pixelsPer10Min * 6, // 1時間固定（将来的にドラッグで調整）
+    height: pixelsPer10Min * 6,
     realtime_status: "配置済み",
     position_start_time: startTime,
   };
 
   localMembers.value.push(newMember);
-
   console.log(`メンバー ${member.name_kanji} を ${startTime} に配置`);
 }
 </script>
