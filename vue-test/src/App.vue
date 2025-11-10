@@ -14,6 +14,9 @@
 
       <!-- シフト管理画面 -->
       <ShiftCreateView v-if="currentView === 'shift'" @back="currentView = 'menu'" />
+      <router-link to="/test-members" class="px-2 py-1 bg-gray-200 rounded">
+  テスト登録
+</router-link>
     </main>
   </div>
 </template>
