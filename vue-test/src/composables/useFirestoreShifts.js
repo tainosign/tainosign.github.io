@@ -1,67 +1,39 @@
-// src/composables/useFirestoreShifts.js
-import { useFirebase } from "@/composables/useFirebase.js";
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
-import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
+// composables/useFirestoreShifts.js
+import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
+import { getApp } from "firebase/app";
+import { createShiftModel } from "@/models/shiftModel";
 
-export function useFirestoreShifts() {
-  // === Firestoreコレクションのルートパス ===
-  const basePath = "artifacts/setapanmarketcounter/public/data/shifts";
+const useFirebase = () => {
+  const app = getApp();
+  const db = getFirestore(app);
+  return { db };
+};
 
-  const initColRef = async () => {
-    const { db } = await useFirebase();
-    return collection(db, basePath);
-  };
+/**
+ * 複数日付のシフトを保存（shiftModel準拠）
+ */
+export const saveShiftsByDates = async (shifts) => {
+  const { db } = useFirebase();
 
-  // === シフト追加 ===
-  const addShift = async (data) => {
-    const colRef = await initColRef();
-    const shift = createShiftModel(data);
-    await setDoc(doc(colRef, shift.id), shift);
-    return shift;
-  };
+  for (const shift of shifts) {
+    if (!shift?.day) continue; // dayが無ければ保存しない
+    const ref = doc(db, "artifacts/setapanmarketcounter/public/data/shifts", shift.id);
+    const data = { ...shift, updated_at: new Date() };
+    await setDoc(ref, data, { merge: true });
+    console.log(`✅ 保存完了: ${shift.day}`);
+  }
+};
 
-  // === 全シフト取得 ===
-  const getShifts = async () => {
-    const colRef = await initColRef();
-    const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data());
-  };
+/**
+ * 指定した日付配列からシフトを取得（shiftModel構造で返す）
+ */
+export const getShiftsByDates = async (dateArray) => {
+  const { db } = useFirebase();
+  const colRef = collection(db, "artifacts/setapanmarketcounter/public/data/shifts");
+  const q = query(colRef, where("day", "in", dateArray));
+  const snap = await getDocs(q);
 
-  // === シフト更新 ===
-  const updateShift = async (id, updates) => {
-    const colRef = await initColRef();
-    await updateDoc(doc(colRef, id), { ...updates, updated_at: new Date() });
-  };
-
-  // === スロット追加 ===
-  const addSlotToShift = async (shiftId, slotData) => {
-    const colRef = await initColRef();
-    const slot = createSlotModel(slotData);
-    const ref = doc(colRef, shiftId);
-    const snap = await getDoc(ref);
-    const shift = snap.data();
-    const updatedSlots = [...(shift.slots || []), slot];
-    await updateDoc(ref, { slots: updatedSlots, updated_at: new Date() });
-    return slot;
-  };
-
-  // === リアルタイム同期 ===
-  const syncShifts = async (callback) => {
-    const colRef = await initColRef();
-    return onSnapshot(colRef, (snapshot) => {
-      const data = snapshot.docs.map((d) => d.data());
-      callback(data);
-    });
-  };
-
-  return { addShift, getShifts, updateShift, addSlotToShift, syncShifts };
-      }
+  const result = snap.docs.map((d) => createShiftModel(d.data()));
+  console.log("📥 読み込み完了:", result.map((r) => r.day));
+  return result;
+};
