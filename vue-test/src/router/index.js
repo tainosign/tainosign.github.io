@@ -1,4 +1,6 @@
 import TestMemberRegister from "@/components/TestMemberRegister.vue";
+import Home from "@/views/Home.vue";
+import ShiftPage from "@/views/ShiftPage.vue";
 
 const routes = [
   // 既存ルート
