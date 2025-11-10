@@ -5,17 +5,6 @@
     <main class="p-4">
       <!-- メニュー -->
       <MainMenu v-if="currentView === 'menu'" @selectView="currentView = $event" />
-
-      <!-- メニュー内のテストメンバー登録ボタン -->
-<div v-if="currentView === 'menu'" class="mt-4">
-  <router-link
-    to="/test-members"
-    class="inline-block px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
-  >
-    テストメンバー登録
-  </router-link>
-</div>
-
       <!-- カウンター画面 -->
       <CounterEntrance v-if="currentView === 'entrance'" @back="currentView = 'menu'" />
       <CounterLocal v-if="currentView === 'local'" @back="currentView = 'menu'" />
@@ -25,7 +14,6 @@
       <ShiftCreateView v-if="currentView === 'shift'" @back="currentView = 'menu'" />
 
       <!-- ルーター表示 -->
-      <router-view />
     </main>
   </div>
 </template>
