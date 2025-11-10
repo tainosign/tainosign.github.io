@@ -58,39 +58,64 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from "vue";
 
-const props = defineProps({
-  dateId: { type: String, required: true },
-  teamId: { type: String, required: true },
-  position: { type: Object, required: true },
-});
+interface Slot {
+  slotId: string;
+  time: string;
+  member: string | null;
+}
 
-const emit = defineEmits(["update", "delete"]);
+interface Position {
+  positionId: string;
+  name: string;
+  slots: Slot[];
+}
+
+const props = defineProps<{
+  dateId: string;
+  teamId: string;
+  position: Position;
+}>();
+
+const emit = defineEmits<{
+  (e: "update", position: Position): void;
+  (e: "delete", positionId: string): void;
+}>();
 
 const positionName = ref(props.position.name || "");
-const slots = ref(props.position.slots || []);
+const slots = ref<Slot[]>(props.position.slots || []);
 
-// 親へ変更通知
-watch([positionName, slots], () => {
-  emit("update", {
-    ...props.position,
-    name: positionName.value,
-    slots: slots.value,
-  });
-}, { deep: true });
+watch(
+  [positionName, slots],
+  () => {
+    emit("update", {
+      ...props.position,
+      name: positionName.value,
+      slots: slots.value,
+    });
+  },
+  { deep: true }
+);
 
-// スロット追加
-const addSlot = () => {
-  const newSlot = {
+function addSlot() {
+  const newSlot: Slot = {
     slotId: `slot_${Date.now()}`,
     time: "10:00",
     member: null,
   };
   slots.value.push(newSlot);
-};
+}
 
-// スロット削除
-const deleteSlot = (slotId) => {
-  slots.value =
+function deleteSlot(slotId: string) {
+  slots.value = slots.value.filter((s) => s.slotId !== slotId);
+}
+
+function editSlot(slotId: string) {
+  const slot = slots.value.find((s) => s.slotId === slotId);
+  if (!slot) return;
+  const newTime = prompt("新しい時間を入力（例: 09:30）", slot.time);
+  if (newTime) slot.time = newTime;
+}
+</script>
