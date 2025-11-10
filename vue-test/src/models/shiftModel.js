@@ -70,7 +70,7 @@ export const createMemberModel = (data = {}) => ({
 export const createShiftModel = (data = {}) => ({
   id: data.id || uuidv4(),
   name: data.name || "",
-  day: data.day || "1日目",
+  day: data.day || "",//YYYY-MM-DD
   slots: data.slots || [], // 各スロット情報を配列で保持
   created_at: new Date(),
   updated_at: new Date(),
