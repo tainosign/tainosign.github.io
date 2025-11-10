@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>パン屋マップ</title>
+    <style>
+        /* 地図のサイズ調整 */
+        #map {
+            height: 90vh;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>パン屋マップ</h1>
+    <div id="map"></div>
+
+    <!-- パン屋データ -->
+    <script>
+    const bakeries = [
+        {"name": "COBOTO BAKERY SHOP", "lat": 35.662, "lng": 139.704, "winner": false},
+        {"name": "hnn", "lat": 35.665, "lng": 139.709, "winner": false},
+        {"name": "ベストブレッドコンテスト", "lat": 35.667, "lng": 139.710, "winner": true},
+        {"name": "川越ベーカリー楽楽", "lat": 35.661, "lng": 139.705, "winner": false}
+        // 実際は先ほどのJSON全部入れる
+    ];
+    </script>
+
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+    <script>
+    function initMap() {
+        // 地図の中心を適当に設定
+        const center = { lat: 35.664, lng: 139.707 };
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 14,
+            center: center
+        });
+
+        // マーカーの作成
+        bakeries.forEach(bakery => {
+            const marker = new google.maps.Marker({
+                position: { lat: bakery.lat, lng: bakery.lng },
+                map: map,
+                title: bakery.name,
+                icon: bakery.winner ? "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+                                     : "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+            });
+
+            // 情報ウィンドウ
+            const infoWindow = new google.maps.InfoWindow({
+                content: `<strong>${bakery.name}</strong><br>受賞: ${bakery.winner ? "はい" : "いいえ"}`
+            });
+
+            marker.addListener("click", () => {
+                infoWindow.open(map, marker);
+            });
+        });
+    }
+
+    window.onload = initMap;
+    </script>
+</body>
+</html>
