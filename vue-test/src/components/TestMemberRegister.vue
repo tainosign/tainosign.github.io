@@ -1,6 +1,7 @@
 <template>
-  <div class="p-4 bg-white shadow rounded max-w-md mx-auto">
-    <h2 class="text-lg font-bold mb-2">テストメンバー登録</h2>
+  <div class="p-6 max-w-md mx-auto">
+    <h2 class="text-xl font-bold mb-4">テストメンバー登録</h2>
+
     <div v-if="done" class="text-green-600 mb-2">登録完了！</div>
     <div v-if="error" class="text-red-600 mb-2">{{ error }}</div>
 
@@ -9,7 +10,7 @@
       :disabled="isRunning || done"
       class="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-300"
     >
-      テストメンバー登録
+      登録実行
     </button>
 
     <ul class="mt-4">
@@ -64,5 +65,5 @@ const registerTestMembers = async () => {
 </script>
 
 <style scoped>
-/* 簡易スタイル */
+/* 最小限のスタイル */
 </style>
