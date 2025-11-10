@@ -58,7 +58,7 @@ const shiftStore = useShiftStore();
 // 🔹 初回ロードで Firebase から取得
 onMounted(async () => {
   if (!shiftStore.members.length) {
-    await shiftStore.initRealtimeSync();
+    await shiftStore.init();
   }
 });
 
