@@ -1,54 +1,64 @@
-// src/stores/shiftStore.js
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { useFirestoreShifts } from "@/composables/useFirestoreShifts";
-import { useFirestoreMembers } from "@/composables/useFirestoreMembers";
+// src/composables/useFirestoreShifts.js
+import { useFirebase } from "./useFirebase.js";
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
+import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
 
-export const useShiftStore = defineStore("shift", () => {
-  const shifts = ref([]);
-  const members = ref([]);
-  const isLoading = ref(false);
-
-  // Firestore 操作
-  const { addShift, getShifts, updateShift, addSlotToShift, syncShifts } = useFirestoreShifts();
-  const { addMember, getMembers, updateMember, deleteMember, syncMembers } = useFirestoreMembers();
-
-  // 初期化・リアルタイム同期
-  const initRealtimeSync = async () => {
-    isLoading.value = true;
-    try {
-      await syncShifts((data) => (shifts.value = data));
-      await syncMembers((data) => (members.value = data));
-    } catch (e) {
-      console.error("Realtime sync error:", e);
-    } finally {
-      isLoading.value = false;
-    }
+export function useFirestoreShifts() {
+  const initColRef = async () => {
+    const { db } = await useFirebase();
+    return collection(db, "shifts");
   };
 
-  // シフト操作
-  const addNewShift = async (dateStr) => {
-    const newShift = { date: dateStr, slots: [] };
-    await addShift(newShift);
+  // -------------------
+  // データ操作
+  // -------------------
+  const addShift = async (data) => {
+    const colRef = await initColRef();
+    const shift = createShiftModel(data);
+    await setDoc(doc(colRef, shift.id), shift);
+    return shift;
   };
 
-  // メンバー操作
-  const assignMemberToSlot = async (memberId, slotId, teamId, positionId) => {
-    const member = members.value.find(m => m.id === memberId);
-    if (!member) return;
-    member.status = "配置済み";
-    member.teamId = teamId;
-    member.positionId = positionId;
-    member.shiftIds.push(slotId);
-    await updateMember(member.id, member);
+  const getShifts = async () => {
+    const colRef = await initColRef();
+    const snap = await getDocs(colRef);
+    return snap.docs.map((d) => d.data());
   };
 
-  return {
-    shifts,
-    members,
-    isLoading,
-    initRealtimeSync,
-    addNewShift,
-    assignMemberToSlot,
+  const updateShift = async (id, updates) => {
+    const colRef = await initColRef();
+    await updateDoc(doc(colRef, id), { ...updates, updated_at: new Date() });
   };
-});
+
+  const addSlotToShift = async (shiftId, slotData) => {
+    const colRef = await initColRef();
+    const slot = createSlotModel(slotData);
+    const ref = doc(colRef, shiftId);
+    const snap = await getDoc(ref);
+    const shift = snap.data();
+    const updatedSlots = [...(shift.slots || []), slot];
+    await updateDoc(ref, { slots: updatedSlots, updated_at: new Date() });
+    return slot;
+  };
+
+  // -------------------
+  // リアルタイム監視
+  // -------------------
+  const syncShifts = async (callback) => {
+    const colRef = await initColRef();
+    return onSnapshot(colRef, (snapshot) => {
+      const data = snapshot.docs.map((d) => d.data());
+      callback(data);
+    });
+  };
+
+  return { addShift, getShifts, updateShift, addSlotToShift, syncShifts };
+}
