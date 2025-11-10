@@ -1,31 +1,36 @@
 name: Firebase Hosting 自動デプロイ (testブランチ)
 
 on:
-  push:
-    branches:
-      - test
+push:
+branches:
+- test
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+deploy:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: 🚀 コードのチェックアウト
-        uses: actions/checkout@v4
+steps:  
+  - name: 🚀 コードのチェックアウト  
+    uses: actions/checkout@v4  
 
-      - name: 💻 Node.jsのセットアップ
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+  - name: 💻 Node.jsのセットアップ  
+    uses: actions/setup-node@v4  
+    with:  
+      node-version: '20'  
 
-      - name: 📂 publicフォルダを確認
-        run: ls -R public
+  - name: 📦 依存関係のインストールとビルド  
+    working-directory: vue-test  
+    run: |  
+      rm -rf node_modules dist  
+      npm ci  
+      npm run build  
 
-      - name: 🔥 Firebase Hostingへデプロイ
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SETAPANMARKETCOUNTER }}
-          channelId: live
-          projectId: setapanmarketcounter
-          # 静的ページの場合は deploy_dir に public を指定
-          deploy_dir: public
+  - name: 📂 distフォルダを確認  
+    run: ls -R dist  
+
+  - name: 🔥 Firebase Hostingへデプロイ  
+    uses: FirebaseExtended/action-hosting-deploy@v0  
+    with:  
+      firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SETAPANMARKETCOUNTER }}  
+      channelId: live  
+      projectId: setapanmarketcounter
