@@ -15,7 +15,7 @@ import { createMemberModel } from "../models/shiftModel.js";
 export function useFirestoreMembers() {
   const initColRef = async () => {
     const { db } = await useFirebase();
-    return collection(db, "members");
+    return collection(db, "artifacts/setapanmarketcounter/public/data/members");
   };
 
   const addMember = async (data) => {
