@@ -31,5 +31,5 @@ const props = defineProps({
   positions: Array,
 });
 
-const addSlot = () => props.position.slots.push(createSlot());
+const addSlot = () => props.position.slots.push(createSlotModel());
 </script>
