@@ -1,5 +1,5 @@
 // src/composables/useFirestoreMembers.js
-import { useFirebase } from "./useFirebase.js";
+import { useFirebase } from "@/composables/useFirebase.js";
 import {
   collection,
   doc,
@@ -10,24 +10,24 @@ import {
   getDocs,
   onSnapshot,
 } from "firebase/firestore";
-import { createMemberModel } from "../models/shiftModel.js";
 
 export function useFirestoreMembers() {
+  const basePath = "artifacts/setapanmarketcounter/public/data/members";
+
   const initColRef = async () => {
     const { db } = await useFirebase();
-    return collection(db, "artifacts/setapanmarketcounter/public/data/members");
+    return collection(db, basePath);
   };
 
   const addMember = async (data) => {
     const colRef = await initColRef();
-    const member = createMemberModel(data);
-    await setDoc(doc(colRef, member.id), member);
-    return member;
+    await setDoc(doc(colRef, data.id), data);
   };
 
   const getMembers = async () => {
     const colRef = await initColRef();
     const snap = await getDocs(colRef);
+    if (snap.empty) return [];
     return snap.docs.map((d) => d.data());
   };
 
@@ -56,4 +56,4 @@ export function useFirestoreMembers() {
     deleteMember,
     syncMembers,
   };
-}
+                                      }
