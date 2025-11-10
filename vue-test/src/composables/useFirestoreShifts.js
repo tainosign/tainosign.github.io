@@ -14,7 +14,7 @@ import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
 export function useFirestoreShifts() {
   const initColRef = async () => {
     const { db } = await useFirebase();
-    return collection(db, "shifts");
+    return collection(db, "artifacts/setapanmarketcounter/public/data/shifts");
   };
 
   // -------------------
