@@ -11,29 +11,37 @@ import {
 } from "firebase/firestore";
 import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
 
-export async function useFirestoreShifts() {
-  const { db } = await useFirebase();
-  const colRef = collection(db, "shifts");
+export function useFirestoreShifts() {
+  // 初期化関数
+  const init = async () => {
+    const { db } = await useFirebase();
+    const colRef = collection(db, "shifts");
+    return { db, colRef };
+  };
 
   // -------------------
   // データ操作
   // -------------------
   const addShift = async (data) => {
+    const { colRef } = await init();
     const shift = createShiftModel(data);
     await setDoc(doc(colRef, shift.id), shift);
     return shift;
   };
 
   const getShifts = async () => {
+    const { colRef } = await init();
     const snap = await getDocs(colRef);
     return snap.docs.map((d) => d.data());
   };
 
   const updateShift = async (id, updates) => {
+    const { colRef } = await init();
     await updateDoc(doc(colRef, id), { ...updates, updated_at: new Date() });
   };
 
   const addSlotToShift = async (shiftId, slotData) => {
+    const { colRef } = await init();
     const slot = createSlotModel(slotData);
     const ref = doc(colRef, shiftId);
     const snap = await getDoc(ref);
@@ -46,7 +54,8 @@ export async function useFirestoreShifts() {
   // -------------------
   // リアルタイム監視
   // -------------------
-  const syncShifts = (callback) => {
+  const syncShifts = async (callback) => {
+    const { colRef } = await init();
     return onSnapshot(colRef, (snapshot) => {
       const data = snapshot.docs.map((d) => d.data());
       callback(data);
