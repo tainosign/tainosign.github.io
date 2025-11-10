@@ -10,7 +10,7 @@ import {
   getDocs,
   onSnapshot,
 } from "firebase/firestore";
-import { createMemberModel } from "../models/memberModel.js";
+import { createMemberModel } from "../models/shiftModel.js";
 
 export function useFirestoreMembers() {
   const initColRef = async () => {
