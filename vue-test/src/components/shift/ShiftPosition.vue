@@ -24,7 +24,7 @@
 import ShiftContainer from "./ShiftContainer.vue";
 import ScrollableRow from "../common/ScrollableRow.vue";
 import ShiftSlot from "./ShiftSlot.vue";
-import { createSlot } from "@/models/shiftModel";
+import { createSlotModel } from "@/models/shiftModel";
 
 const props = defineProps({
   position: Object,
