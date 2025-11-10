@@ -1,11 +1,20 @@
 <template>
   <div>
-    <!-- ヘッダーは currentView が shift の場合は非表示 -->
     <Header v-if="currentView !== 'shift'" />
 
-    <main>
+    <main class="p-4">
       <!-- メニュー -->
       <MainMenu v-if="currentView === 'menu'" @selectView="currentView = $event" />
+
+      <!-- メニュー内のテストメンバー登録ボタン -->
+      <div v-if="currentView === 'menu'" class="mt-4">
+        <router-link
+          to="/test-members"
+          class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          テストメンバー登録
+        </router-link>
+      </div>
 
       <!-- カウンター画面 -->
       <CounterEntrance v-if="currentView === 'entrance'" @back="currentView = 'menu'" />
@@ -15,15 +24,7 @@
       <!-- シフト管理画面 -->
       <ShiftCreateView v-if="currentView === 'shift'" @back="currentView = 'menu'" />
 
-        <!-- 追加: テスト登録ボタン -->
-  <div v-if="currentView === 'menu'" class="mt-4 px-2">
-    <router-link
-      to="/test-members"
-      class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-    >
-      テストメンバー登録
-    </router-link>
-  </div>
+      <!-- ルーター表示 -->
       <router-view />
     </main>
   </div>
