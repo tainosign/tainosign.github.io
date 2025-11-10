@@ -1,5 +1,5 @@
 // src/composables/useFirestoreShifts.js
-import { useFirebase } from "./useFirebase.js";
+import { useFirebase } from "@/composables/useFirebase.js";
 import {
   collection,
   doc,
@@ -12,14 +12,15 @@ import {
 import { createShiftModel, createSlotModel } from "../models/shiftModel.js";
 
 export function useFirestoreShifts() {
+  // === Firestoreコレクションのルートパス ===
+  const basePath = "artifacts/setapanmarketcounter/public/data/shifts";
+
   const initColRef = async () => {
     const { db } = await useFirebase();
-    return collection(db, "artifacts/setapanmarketcounter/public/data/shifts");
+    return collection(db, basePath);
   };
 
-  // -------------------
-  // データ操作
-  // -------------------
+  // === シフト追加 ===
   const addShift = async (data) => {
     const colRef = await initColRef();
     const shift = createShiftModel(data);
@@ -27,17 +28,21 @@ export function useFirestoreShifts() {
     return shift;
   };
 
+  // === 全シフト取得 ===
   const getShifts = async () => {
     const colRef = await initColRef();
     const snap = await getDocs(colRef);
+    if (snap.empty) return [];
     return snap.docs.map((d) => d.data());
   };
 
+  // === シフト更新 ===
   const updateShift = async (id, updates) => {
     const colRef = await initColRef();
     await updateDoc(doc(colRef, id), { ...updates, updated_at: new Date() });
   };
 
+  // === スロット追加 ===
   const addSlotToShift = async (shiftId, slotData) => {
     const colRef = await initColRef();
     const slot = createSlotModel(slotData);
@@ -49,9 +54,7 @@ export function useFirestoreShifts() {
     return slot;
   };
 
-  // -------------------
-  // リアルタイム監視
-  // -------------------
+  // === リアルタイム同期 ===
   const syncShifts = async (callback) => {
     const colRef = await initColRef();
     return onSnapshot(colRef, (snapshot) => {
@@ -61,4 +64,4 @@ export function useFirestoreShifts() {
   };
 
   return { addShift, getShifts, updateShift, addSlotToShift, syncShifts };
-}
+      }
