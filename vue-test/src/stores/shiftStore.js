@@ -5,42 +5,40 @@ import { useFirestoreShifts } from "@/composables/useFirestoreShifts.js";
 import { useFirestoreMembers } from "@/composables/useFirestoreMembers.js";
 
 export const useShiftStore = defineStore("shiftStore", () => {
-  const shifts = ref([]);
+  const shifts = ref([]); // 全シフト
   const members = ref([]);
   const isLoading = ref(false);
-  const isInitialized = ref(false);
 
   let unsubscribeShifts = null;
   let unsubscribeMembers = null;
 
-  // Firestore 操作用 composable を取得
-  const { addShift, getShifts, updateShift, addSlotToShift, syncShifts } =
-    useFirestoreShifts();
-  const { addMember, getMembers, updateMember, deleteMember, syncMembers } =
-    useFirestoreMembers();
+  const {
+    addShift,
+    getShifts,
+    updateShift,
+    addSlotToShift,
+  } = useFirestoreShifts();
 
-  // =========================
-  // 初期化（リアルタイム同期）
-  // =========================
+  const {
+    getMembers,
+    syncMembers,
+  } = useFirestoreMembers();
+
+  // -------------------------
+  // 初期化（1回のみ）
+  // -------------------------
   const init = async () => {
-    if (isInitialized.value) return; // 既に初期化済みならスキップ
-    isInitialized.value = true;
-
     try {
       console.log("🌀 shiftStore 初期化開始...");
       isLoading.value = true;
 
-      // Firestoreから初期データ取得
-      shifts.value = await getShifts();
       members.value = await getMembers();
 
-      // リアルタイム同期開始
-      unsubscribeShifts = syncShifts((data) => {
-        shifts.value = data;
-      });
-      unsubscribeMembers = syncMembers((data) => {
-        members.value = data;
-      });
+      if (!unsubscribeMembers) {
+        unsubscribeMembers = await syncMembers((data) => {
+          members.value = data;
+        });
+      }
 
       console.log("✅ shiftStore: 初期化完了");
     } catch (err) {
@@ -50,9 +48,30 @@ export const useShiftStore = defineStore("shiftStore", () => {
     }
   };
 
-  // =========================
+  // -------------------------
+  // 指定された日付配列でシフトを取得
+  // -------------------------
+  const getShiftsByDates = async (dateArray) => {
+    if (!Array.isArray(dateArray) || dateArray.length === 0) return [];
+    const allShifts = await getShifts();
+    return allShifts.filter(s => dateArray.includes(s.date));
+  };
+
+  // -------------------------
+  // 指定された日付配列のシフトを保存
+  // -------------------------
+  const saveShiftsByDates = async (shiftList) => {
+    if (!Array.isArray(shiftList) || shiftList.length === 0) return;
+
+    for (const shift of shiftList) {
+      if (!shift.date) continue;
+      await addShift(shift); // Firestoreに保存（上書き）
+    }
+  };
+
+  // -------------------------
   // クリーンアップ
-  // =========================
+  // -------------------------
   const cleanup = () => {
     if (unsubscribeShifts) unsubscribeShifts();
     if (unsubscribeMembers) unsubscribeMembers();
@@ -61,19 +80,12 @@ export const useShiftStore = defineStore("shiftStore", () => {
 
   onUnmounted(cleanup);
 
-  // =========================
-  // エクスポート
-  // =========================
   return {
     shifts,
     members,
     isLoading,
-    addShift,
-    updateShift,
-    addSlotToShift,
-    addMember,
-    updateMember,
-    deleteMember,
-    init, // ← initRealtimeSync ではなく init に統一
+    init,
+    getShiftsByDates,
+    saveShiftsByDates,
   };
 });
