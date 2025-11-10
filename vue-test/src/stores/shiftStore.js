@@ -7,11 +7,11 @@ import { useFirestoreMembers } from "@/composables/useFirestoreMembers.js";
 export const useShiftStore = defineStore("shiftStore", () => {
   const shifts = ref([]);
   const members = ref([]);
+  const isLoading = ref(true);
 
   let unsubscribeShifts = null;
   let unsubscribeMembers = null;
 
-  // Firestore 操作用の composable を初期化
   const {
     addShift,
     getShifts,
@@ -29,11 +29,12 @@ export const useShiftStore = defineStore("shiftStore", () => {
   } = useFirestoreMembers();
 
   // =========================
-  // 初期化（リアルタイム同期）
+  // 初期化処理
   // =========================
   const init = async () => {
     try {
       console.log("🌀 shiftStore 初期化開始...");
+      isLoading.value = true;
 
       // Firestoreから初期データ取得
       shifts.value = await getShifts();
@@ -50,6 +51,8 @@ export const useShiftStore = defineStore("shiftStore", () => {
       console.log("✅ shiftStore: 初期化完了");
     } catch (err) {
       console.error("❌ shiftStore 初期化エラー:", err);
+    } finally {
+      isLoading.value = false;
     }
   };
 
@@ -64,18 +67,16 @@ export const useShiftStore = defineStore("shiftStore", () => {
 
   onUnmounted(cleanup);
 
-  // =========================
-  // エクスポート
-  // =========================
   return {
     shifts,
     members,
+    isLoading,
     addShift,
     updateShift,
     addSlotToShift,
     addMember,
     updateMember,
     deleteMember,
-    init, // ← 名前をinitRealtimeSyncからinitに統一
+    init,
   };
 });
