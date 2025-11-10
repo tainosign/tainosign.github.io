@@ -1,5 +1,5 @@
 // src/composables/useFirestoreShifts.js
-import { useFirebase } from "./useFirebase.js";
+import { useFirebase } from "@/composables/useFirebase.js";
 import {
   collection,
   doc,
