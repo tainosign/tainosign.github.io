@@ -88,6 +88,26 @@ export const createSlotModel = (data = {}) => ({
   updated_at: new Date(),
 });
 
+export function createPosition() {
+  return {
+    id: crypto.randomUUID(),
+    name: "新ポジション",
+    slots: [createSlotModel()], // createSlotModel() を呼ぶよう修正
+    locked: false,
+    folded: false,
+  };
+}
+
+export function createTeam(name = "新チーム") {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    positions: [createPosition()],
+    locked: false,
+    folded: false,
+  };
+}
+
 export const createTaskModel = (data = {}) => ({
   id: data.id || uuidv4(),
   task_name: data.task_name || "",
