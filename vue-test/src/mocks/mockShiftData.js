@@ -1,5 +1,5 @@
 // src/mocks/mockShiftData.js
-import { createShift, createMember } from "@/models/shiftModel";
+import { createShiftModel, createMemberModel } from "@/models/shiftModel";
 
 export function mockShiftData() {
   const shift = createShift("2025-11-10");
