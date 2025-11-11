@@ -68,7 +68,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { db } from "@/firebase";
+import { useFirebase } from "@/composables/useFirebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -76,6 +76,7 @@ const route = useRoute();
 const member = ref({});
 
 onMounted(async () => {
+  const { db } = await useFirebase();
   const docRef = doc(db, "artifacts/setapanmarketcounter/public/data/members", route.params.memberId);
   const snap = await getDoc(docRef);
   if (snap.exists()) member.value = snap.data();
