@@ -1,9 +1,6 @@
 // src/models/shiftModel.js
 import { v4 as uuidv4 } from "uuid";
 
-// src/models/shiftModel.js
-import { v4 as uuidv4 } from "uuid";
-
 export const createMemberModel = (data = {}) => ({
   // === ① 基本情報（Googleフォーム等のアンケート由来） ===
   id: data.id || uuidv4(),
