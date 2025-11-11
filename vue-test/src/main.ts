@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
-import { router } from "./router"; // ここを追加
+import router from "./router"; 
 import "./assets/main.css"; // Tailwind読み込み
 
 const app = createApp(App);
