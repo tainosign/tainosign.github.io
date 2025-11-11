@@ -7,12 +7,12 @@
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <!-- 名前 -->
       <div>
-        <label>お名前（漢字）*</label>
+        <label>氏名（漢字）*</label>
         <input v-model="form.name_kanji" required class="input" />
       </div>
 
       <div>
-        <label>お名前（ふりがな）*</label>
+        <label>氏名（ふりがな）*</label>
         <input v-model="form.name_furigana" required class="input" />
       </div>
 
@@ -28,7 +28,7 @@
 
       <!-- 所属 -->
       <div>
-        <label>ご所属*</label>
+        <label>所属*</label>
         <select v-model="form.affiliation" required class="input">
           <option disabled value="">選択してください</option>
           <option>学生</option>
@@ -51,7 +51,7 @@
       </div>
 
       <div>
-        <label>ご住所（市町村まで）*</label>
+        <label>住所（市町村まで）*</label>
         <input v-model="form.address" required class="input" />
       </div>
 
