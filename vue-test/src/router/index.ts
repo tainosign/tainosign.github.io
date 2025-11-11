@@ -4,7 +4,7 @@ import OpenSandSurvey from "@/views/OpenSandSurvey.vue";
 import MemberPage from "@/views/MemberPage.vue";
 
 const routes = [
-  { path: "/jg6p2jg6z", name: "LeaderMenu", component: LeaderMenu },
+  { path: "/jg6p2jg6z", name: "LeaderMenu", component: App },
   { path: "/OPENSAND", name: "OpenSandSurvey", component: OpenSandSurvey },
   { path: "/:memberId", name: "MemberPage", component: MemberPage },
 ];
