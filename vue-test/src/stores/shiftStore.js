@@ -1,54 +1,39 @@
-// stores/shiftStore.js
+// src/stores/shiftStore.js
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { saveShiftsByDates, getShiftsByDates } from "@/composables/useFirestoreShifts";
-import { createShiftModel } from "@/models/shiftModel";
+import { useFirestoreShifts } from "@/composables/useFirestoreShifts";
 
 export const useShiftStore = defineStore("shiftStore", () => {
-  const shifts = ref([]);           // Firestoreから取得した全シフト
-  const selectedDates = ref([]);    // 操作対象日付
+  const shifts = ref([]);
+  const festivalDays = ref([]); // pre1, pre2, day1, day2
+  const activeDay = ref(""); // 現在表示中の日付
   const isLoading = ref(false);
 
-  /**
-   * 指定日付の空シフトを作成
-   */
-  const addShift = (date) => {
-    if (shifts.value.some((s) => s.day === date)) return;
-    const newShift = createShiftModel({
-      name: `${date}のシフト`,
-      day: date,
-      slots: [],
-    });
-    shifts.value.push(newShift);
-  };
-
-  /**
-   * 指定日付のシフトをまとめて保存
-   */
-  const saveSelectedShifts = async () => {
-    if (selectedDates.value.length === 0) return;
-    const targetShifts = shifts.value.filter((s) =>
-      selectedDates.value.includes(s.day)
-    );
-    await saveShiftsByDates(targetShifts);
-  };
-
-  /**
-   * 指定日付のシフトをまとめて読み込み
-   */
-  const loadSelectedShifts = async () => {
-    if (selectedDates.value.length === 0) return;
+  const loadFestivalShifts = async () => {
+    const { getFestivalDays, getAllFestivalShifts } = await useFirestoreShifts();
     isLoading.value = true;
-    shifts.value = await getShiftsByDates(selectedDates.value);
+    festivalDays.value = await getFestivalDays();
+    shifts.value = await getAllFestivalShifts();
+    if (!activeDay.value && festivalDays.value.length > 0) {
+      activeDay.value = festivalDays.value[0];
+    }
     isLoading.value = false;
+  };
+
+  const getShiftForActiveDay = () =>
+    shifts.value.find((s) => s.day === activeDay.value);
+
+  const setActiveDay = (date) => {
+    activeDay.value = date;
   };
 
   return {
     shifts,
-    selectedDates,
+    festivalDays,
+    activeDay,
     isLoading,
-    addShift,
-    saveSelectedShifts,
-    loadSelectedShifts,
+    loadFestivalShifts,
+    getShiftForActiveDay,
+    setActiveDay,
   };
 });
