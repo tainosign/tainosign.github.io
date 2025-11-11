@@ -114,7 +114,7 @@
 
 <script setup>
 import { ref } from "vue";
-import { db } from "@/firebase";
+import { useFirebase } from "@/composables/useFirebase";
 import { doc, setDoc } from "firebase/firestore";
 import { nanoid } from "nanoid";
 import { createMemberModel } from "@/models/shiftModel";
@@ -143,6 +143,8 @@ const submitted = ref(false);
 const generatedId = ref("");
 
 const handleSubmit = async () => {
+  const { db } = await useFirebase(); // ← Firestore取得
+
   const id = nanoid(10);
   generatedId.value = id;
 
