@@ -135,8 +135,9 @@ const form = ref({
 });
 
 const scheduleOptions = ref([
-  { label: "10月25日（土）事前準備 13:00～17:00", selected: false, timeType: "全部", start: "13:00", end: "17:00" },
-  { label: "10月31日（金）前日準備 13:00～17:00", selected: false, timeType: "全部", start: "13:00", end: "17:00" },
+  { label: "10月18日（土）交流会&事前準備 12:00～17:00", selected: false, timeType: "全部", start: "12:00", end: "17:00" },
+  { label: "10月25日（土）交流会&事前準備 12:00～17:00", selected: false, timeType: "全部", start: "12:00", end: "17:00" },
+  { label: "10月31日（金）前日準備 10:00～17:00", selected: false, timeType: "全部", start: "10:00", end: "17:00" },
   { label: "11月1日（土）イベント1日目 7:00～19:00", selected: false, timeType: "全部", start: "07:00", end: "19:00" },
   { label: "11月2日（日）イベント2日目 7:00～19:00", selected: false, timeType: "全部", start: "07:00", end: "19:00" },
 ]);
