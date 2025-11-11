@@ -70,17 +70,14 @@ import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { db } from "@/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 
 const route = useRoute();
 const member = ref({});
 
 onMounted(async () => {
-  const token = route.params.token;
-  const q = query(
-    collection(db, "artifacts/setapanmarketcounter/public/data/members"),
-    where("token", "==", token)
-  );
-  const snap = await getDocs(q);
-  if (!snap.empty) member.value = snap.docs[0].data();
+  const docRef = doc(db, "artifacts/setapanmarketcounter/public/data/members", route.params.memberId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) member.value = snap.data();
 });
 </script>
