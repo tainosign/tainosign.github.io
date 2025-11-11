@@ -1,39 +1,64 @@
-// composables/useFirestoreShifts.js
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
-import { getApp } from "firebase/app";
-import { createShiftModel } from "@/models/shiftModel";
+// src/composables/useFirestoreShifts.js
+import { useFirebase } from "@/composables/useFirebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { getJSTDateString, toYMD_JST } from "./useJST.js";
 
-const useFirebase = () => {
-  const app = getApp();
-  const db = getFirestore(app);
-  return { db };
-};
+export async function useFirestoreShifts() {
+  const { db } = await useFirebase();
+  const appId = "setapanmarketcounter";
+  const basePath = `artifacts/${appId}/public/data/shifts`;
 
-/**
- * 複数日付のシフトを保存（shiftModel準拠）
- */
-export const saveShiftsByDates = async (shifts) => {
-  const { db } = useFirebase();
+  /**
+   * Firestoreのstatic/dayから日程情報を取得
+   * （pre1, pre2, day1, day2）
+   */
+  const getFestivalDays = async () => {
+    const dayRef = doc(db, `artifacts/${appId}/public/data/static/day`);
+    const daySnap = await getDoc(dayRef);
+    if (!daySnap.exists()) return [];
+    const data = daySnap.data();
 
-  for (const shift of shifts) {
-    if (!shift?.day) continue; // dayが無ければ保存しない
-    const ref = doc(db, "artifacts/setapanmarketcounter/public/data/shifts", shift.id);
-    const data = { ...shift, updated_at: new Date() };
-    await setDoc(ref, data, { merge: true });
-    console.log(`✅ 保存完了: ${shift.day}`);
-  }
-};
+    const days = [];
+    ["pre1", "pre2", "day1", "day2"].forEach((key) => {
+      if (data[key]) days.push(toYMD_JST(data[key]));
+    });
+    return days;
+  };
 
-/**
- * 指定した日付配列からシフトを取得（shiftModel構造で返す）
- */
-export const getShiftsByDates = async (dateArray) => {
-  const { db } = useFirebase();
-  const colRef = collection(db, "artifacts/setapanmarketcounter/public/data/shifts");
-  const q = query(colRef, where("day", "in", dateArray));
-  const snap = await getDocs(q);
+  /**
+   * 指定日付のシフトを取得
+   */
+  const getShiftByDate = async (date) => {
+    const ref = doc(db, `${basePath}/${date}`);
+    const snap = await getDoc(ref);
+    return snap.exists() ? snap.data() : null;
+  };
 
-  const result = snap.docs.map((d) => createShiftModel(d.data()));
-  console.log("📥 読み込み完了:", result.map((r) => r.day));
-  return result;
-};
+  /**
+   * 祭りと準備日の全シフトを取得
+   */
+  const getAllFestivalShifts = async () => {
+    const days = await getFestivalDays();
+    const results = [];
+    for (const d of days) {
+      const shift = await getShiftByDate(d);
+      if (shift) results.push(shift);
+    }
+    return results;
+  };
+
+  /**
+   * シフトの保存（更新も含む）
+   */
+  const saveShift = async (date, data) => {
+    const ref = doc(db, `${basePath}/${date}`);
+    await setDoc(ref, { ...data, updated_at: new Date() });
+  };
+
+  return {
+    getFestivalDays,
+    getShiftByDate,
+    getAllFestivalShifts,
+    saveShift,
+  };
+}
