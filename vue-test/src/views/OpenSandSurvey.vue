@@ -7,12 +7,12 @@
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <!-- 名前 -->
       <div>
-        <label>氏名（漢字）*</label>
+        <label>氏名*</label>
         <input v-model="form.name_kanji" required class="input" />
       </div>
 
       <div>
-        <label>氏名（ふりがな）*</label>
+        <label>ふりがな*</label>
         <input v-model="form.name_furigana" required class="input" />
       </div>
 
