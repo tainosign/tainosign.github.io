@@ -14,6 +14,7 @@
       <ShiftCreateView v-if="currentView === 'shift'" @back="currentView = 'menu'" />
 
       <!-- ルーター表示 -->
+      <router-view /> <!-- ← ここでルートコンポーネントを表示 -->
     </main>
   </div>
 </template>
