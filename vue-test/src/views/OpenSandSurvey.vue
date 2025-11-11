@@ -161,7 +161,7 @@ const handleSubmit = async () => {
     available_dates,
   });
 
-  await setDoc(doc(db, `artifacts/setapanmarketcounter/public/data/members/${id}`), memberData);
+  await setDoc(doc(db, "artifacts/setapanmarketcounter/public/data/members", id), memberData);
   submitted.value = true;
 };
 </script>
