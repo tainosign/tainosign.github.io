@@ -1,5 +1,18 @@
 <template>
-  <!-- ボタン固定 -->
+  <!-- シフト日選択 -->
+  <div class="fixed top-4 right-4 bg-white shadow rounded p-2 z-50 flex gap-2">
+    <button
+      v-for="d in shiftStore.festivalDays"
+      :key="d"
+      @click="shiftStore.setActiveDay(d)"
+      class="px-3 py-1 rounded border"
+      :class="shiftStore.activeDay === d ? 'bg-blue-500 text-white' : 'bg-gray-100'"
+    >
+      {{ d }}
+    </button>
+  </div>
+
+  <!-- メンバー開閉ボタン -->
   <button
     @click="togglePanel"
     class="fixed top-1/2 transform -translate-y-1/2 bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical transition-all duration-300"
@@ -8,7 +21,7 @@
     メンバー
   </button>
 
-  <!-- パネル固定 -->
+  <!-- メンバーパネル -->
   <transition name="slide">
     <div
       v-if="showPanel"
@@ -26,11 +39,9 @@
         <select v-model="filterStatus" class="border rounded p-1 text-sm">
           <option value="unassigned">未配置</option>
           <option value="assigned">配置済み</option>
-          <option value="resting">休憩中</option>
         </select>
       </div>
 
-      <!-- 🔹 フィルタされたメンバー一覧 -->
       <div
         v-for="m in filteredMembers"
         :key="m.id"
@@ -38,8 +49,7 @@
         draggable="true"
         @dragstart="onDragStart(m)"
       >
-        <div class="font-semibold">{{ m.name }}</div>
-        <div class="text-xs text-gray-500">{{ m.team || '未配置' }}</div>
+        <div class="font-semibold">{{ m.name_kanji || m.name }}</div>
       </div>
     </div>
   </transition>
@@ -48,45 +58,45 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
+import { useMemberStore } from "@/stores/memberStore";
 
 const showPanel = ref(false);
 const panelWidth = 400;
 const filterStatus = ref("unassigned");
 
 const shiftStore = useShiftStore();
+const memberStore = useMemberStore();
 
-// 🔹 初回ロードで Firebase から取得
 onMounted(async () => {
-  if (!shiftStore.members.length) {
-    await shiftStore.init();
-  }
+  await memberStore.loadMembers();
+  await shiftStore.loadFestivalShifts();
 });
 
-// 🔹 フィルタリング
 const filteredMembers = computed(() => {
-  return shiftStore.members.filter((m) => {
-    if (filterStatus.value === "unassigned") return !m.teamId;
-    if (filterStatus.value === "assigned") return m.teamId;
-    if (filterStatus.value === "resting") return m.resting;
+  const activeShift = shiftStore.getShiftForActiveDay();
+  const assignedIds =
+    activeShift?.slots.flatMap((slot) => slot.members.map((m) => m.id)) || [];
+
+  return memberStore.members.filter((m) => {
+    const assigned = assignedIds.includes(m.id);
+    if (filterStatus.value === "unassigned") return !assigned;
+    if (filterStatus.value === "assigned") return assigned;
     return true;
   });
 });
 
-const togglePanel = () => {
-  showPanel.value = !showPanel.value;
-};
+const togglePanel = () => (showPanel.value = !showPanel.value);
 
 const onDragStart = (member) => (e) => {
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("application/json", JSON.stringify(member));
-  console.log(`ドラッグ開始: ${member.name}`);
+  console.log(`ドラッグ開始: ${member.name_kanji || member.name}`);
 };
 
 const autoAssign = () => {
   console.log("自動配置機能（後で実装）");
 };
 </script>
-
 
 <style scoped>
 .writing-vertical {
