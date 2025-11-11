@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LeaderMenu from "@/views/LeaderMenu.vue";
+//import LeaderMenu from "@/views/LeaderMenu.vue";
+import App from "@/App.vue";
 import OpenSandSurvey from "@/views/OpenSandSurvey.vue";
 import MemberPage from "@/views/MemberPage.vue";
 
