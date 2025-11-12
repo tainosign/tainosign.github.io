@@ -1,15 +1,13 @@
-// src/stores/shiftStore.js
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useFirestoreShifts } from "@/composables/useFirestoreShifts";
 
 export const useShiftStore = defineStore("shiftStore", () => {
   const shifts = ref([]);
-  const festivalDays = ref([]); // pre1, pre2, day1, day2
-  const activeDay = ref(""); // 現在表示中の日付
+  const festivalDays = ref([]);
+  const activeDay = ref("");
   const isLoading = ref(false);
 
-  // 🔹 祭り・準備日のシフトを読み込み
   const loadFestivalShifts = async () => {
     const { getFestivalDays, getAllFestivalShifts } = await useFirestoreShifts();
     isLoading.value = true;
@@ -21,7 +19,6 @@ export const useShiftStore = defineStore("shiftStore", () => {
     isLoading.value = false;
   };
 
-  // 🔹 アクティブな日付のシフト取得
   const getShiftForActiveDay = () =>
     shifts.value.find((s) => s.day === activeDay.value);
 
@@ -29,7 +26,6 @@ export const useShiftStore = defineStore("shiftStore", () => {
     activeDay.value = date;
   };
 
-  // 🔹 新規シフト作成
   const createNewShift = (dates) => {
     const newShifts = dates.map((date) => ({
       id: `${date}-${Date.now()}`,
@@ -39,7 +35,6 @@ export const useShiftStore = defineStore("shiftStore", () => {
     shifts.value.push(...newShifts);
   };
 
-  // 🔹 指定日付のシフト読み込み
   const getShiftsByDates = async (dates) => {
     const { getShiftByDate } = await useFirestoreShifts();
     const result = [];
@@ -50,18 +45,104 @@ export const useShiftStore = defineStore("shiftStore", () => {
     return result;
   };
 
-  // 🔹 指定日付のシフト保存（JSTファイル名）
   const saveShiftsByDates = async (shiftList, fileName = "shift") => {
     const { saveShift } = await useFirestoreShifts();
-
-    // JST現在時刻をファイル名用に整形
     const jst = new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
     const timestamp = jst.replace(/[/: ]/g, "-");
-
     for (const s of shiftList) {
       const saveName = `${fileName}-${s.date}-${timestamp}`;
       await saveShift(saveName, s);
     }
+  };
+
+  // -------------------
+  // 🔹 チーム・ポジション・スロット操作
+  // -------------------
+
+  const addTeam = (date) => {
+    const shift = shifts.value.find((s) => s.date === date);
+    if (!shift) return;
+    shift.teams.push({
+      id: `team_${Date.now()}`,
+      name: `新しいチーム ${shift.teams.length + 1}`,
+      folded: false,
+      locked: false,
+      positions: [],
+    });
+  };
+
+  const removeTeam = (date, teamId) => {
+    const shift = shifts.value.find((s) => s.date === date);
+    if (!shift) return;
+    shift.teams = shift.teams.filter((t) => t.id !== teamId);
+  };
+
+  const duplicateTeam = (date, teamId) => {
+    const shift = shifts.value.find((s) => s.date === date);
+    if (!shift) return;
+    const team = shift.teams.find((t) => t.id === teamId);
+    if (!team) return;
+    const newTeam = structuredClone(team);
+    newTeam.id = `team_${Date.now()}`;
+    shift.teams.push(newTeam);
+  };
+
+  const moveTeam = (fromDate, toDate, teamId) => {
+    const fromShift = shifts.value.find((s) => s.date === fromDate);
+    const toShift = shifts.value.find((s) => s.date === toDate);
+    if (!fromShift || !toShift) return;
+    const idx = fromShift.teams.findIndex((t) => t.id === teamId);
+    if (idx === -1) return;
+    const [team] = fromShift.teams.splice(idx, 1);
+    toShift.teams.push(team);
+  };
+
+  const addPosition = (date, teamId) => {
+    const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
+    if (!team) return;
+    team.positions.push({
+      positionId: `pos_${Date.now()}`,
+      name: `新しいポジション ${team.positions.length + 1}`,
+      folded: false,
+      locked: false,
+      slots: [],
+    });
+  };
+
+  const removePosition = (date, teamId, positionId) => {
+    const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
+    if (!team) return;
+    team.positions = team.positions.filter((p) => p.positionId !== positionId);
+  };
+
+  const duplicatePosition = (date, teamId, positionId) => {
+    const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
+    if (!team) return;
+    const pos = team.positions.find((p) => p.positionId === positionId);
+    if (!pos) return;
+    const newPos = structuredClone(pos);
+    newPos.positionId = `pos_${Date.now()}`;
+    team.positions.push(newPos);
+  };
+
+  const addSlot = (date, teamId, positionId) => {
+    const pos = shifts.value.find((s) => s.date === date)
+      ?.teams.find((t) => t.id === teamId)
+      ?.positions.find((p) => p.positionId === positionId);
+    if (!pos) return;
+    pos.slots.push({
+      slotId: `slot_${Date.now()}`,
+      name: `スロット ${pos.slots.length + 1}`,
+      members: [],
+    });
+  };
+
+  const removeSlot = (date, teamId, positionId, slotId) => {
+    const pos = shifts.value.find((s) => s.date === date)
+      ?.teams.find((t) => t.id === teamId)
+      ?.positions.find((p) => p.positionId === positionId);
+    if (!pos) return;
+    pos.slots = pos.slots.filter((s) => s.slotId !== slotId);
   };
 
   return {
@@ -75,5 +156,15 @@ export const useShiftStore = defineStore("shiftStore", () => {
     createNewShift,
     getShiftsByDates,
     saveShiftsByDates,
+
+    addTeam,
+    removeTeam,
+    duplicateTeam,
+    moveTeam,
+    addPosition,
+    removePosition,
+    duplicatePosition,
+    addSlot,
+    removeSlot,
   };
 });
