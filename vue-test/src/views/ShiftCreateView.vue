@@ -7,7 +7,7 @@
       <!-- コンパクト操作ボタン群 -->
       <div class="flex gap-2">
         <button
-          @click="createNewShift"
+          @click="toggleCreateMode"
           class="bg-gray-500 text-white text-sm px-2 py-1 rounded"
           title="新規シフト作成"
         >
@@ -30,8 +30,8 @@
       </div>
     </div>
 
-    <!-- 📅 カレンダー式日付選択 -->
-    <div class="border rounded p-2 mb-2">
+    <!-- ✅ 新規作成モードのときだけ表示 -->
+    <div v-if="isCreating" class="border rounded p-2 mb-2 bg-gray-50">
       <label class="font-semibold text-sm mb-1 block">📅 日付を選択（複数可）</label>
       <div class="flex flex-wrap gap-1">
         <input
@@ -48,7 +48,7 @@
       </div>
 
       <!-- 選択済み日付一覧 -->
-      <div class="flex flex-wrap mt-2 gap-1 text-sm">
+      <div v-if="selectedDates.length" class="flex flex-wrap mt-2 gap-1 text-sm">
         <span
           v-for="(d, index) in selectedDates"
           :key="index"
@@ -58,9 +58,18 @@
           {{ d }}
         </span>
       </div>
+
+      <div class="mt-3 text-right">
+        <button
+          @click="confirmCreate"
+          class="bg-blue-600 text-white text-sm px-3 py-1 rounded"
+        >
+          作成
+        </button>
+      </div>
     </div>
 
-    <!-- 📋 読み込んだシフト -->
+    <!-- 📋 作成済み or 読み込み済みシフト -->
     <div v-if="loadedShifts.length > 0">
       <h3 class="font-semibold mb-1 text-sm text-gray-700">シフト一覧</h3>
       <ScrollableRow>
@@ -72,6 +81,7 @@
       </ScrollableRow>
     </div>
 
+    <!-- ❗ まだ何もないとき -->
     <div v-else class="text-gray-500 text-sm mt-2">
       まだシフトは作成または読み込まれていません。
     </div>
@@ -124,6 +134,17 @@ const tempDate = ref("");
 const loadedShifts = ref([]);
 const fileName = ref("");
 const showSaveDialog = ref(false);
+const isCreating = ref(false); // ✅ 追加：新規作成モード制御
+
+// 🔄 新規作成モード切り替え
+const toggleCreateMode = () => {
+  isCreating.value = !isCreating.value;
+  if (isCreating.value) {
+    // モードON時は初期化
+    selectedDates.value = [];
+    tempDate.value = "";
+  }
+};
 
 // ✅ 日付追加
 const addDate = () => {
@@ -140,14 +161,15 @@ const removeDate = (index) => {
   selectedDates.value.splice(index, 1);
 };
 
-// ✅ 新規作成
-const createNewShift = () => {
+// ✅ 作成確定ボタン押下
+const confirmCreate = () => {
   if (selectedDates.value.length === 0) {
-    alert("📅 日付を選択してください。");
+    alert("📅 日付を1つ以上選択してください。");
     return;
   }
   store.createNewShift(selectedDates.value);
   loadedShifts.value = store.shifts;
+  isCreating.value = false; // 🔽 作成完了後に非表示へ
   alert("✅ 新しいシフトを作成しました。");
 };
 
