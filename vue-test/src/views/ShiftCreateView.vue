@@ -1,69 +1,68 @@
 <!-- src/views/ShiftCreateView.vue -->
 <template>
-  <div class="p-4">
-    <h2 class="text-xl font-bold mb-3">シフト作成（複数日対応）</h2>
+  <div class="p-2">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-bold">🗓 シフト作成</h2>
 
-    <!-- 日付選択 -->
-    <div class="mb-3">
-      <label class="block mb-1 font-semibold">📅 日付を選択（複数選択可）</label>
-      <div class="flex flex-wrap gap-2">
-        <input
-          type="date"
-          v-for="(d, index) in selectedDates"
-          :key="index"
-          v-model="selectedDates[index]"
-          class="border p-1 rounded"
-        />
+      <!-- コンパクト操作ボタン群 -->
+      <div class="flex gap-2">
         <button
-          @click="addDateField"
-          class="bg-gray-300 px-2 py-1 rounded"
+          @click="createNewShift"
+          class="bg-gray-500 text-white text-sm px-2 py-1 rounded"
+          title="新規シフト作成"
         >
-          ＋日付追加
+          ＋
+        </button>
+        <button
+          @click="loadShifts"
+          class="bg-blue-500 text-white text-sm px-2 py-1 rounded"
+          title="読み込み"
+        >
+          🔄
+        </button>
+        <button
+          @click="openSaveDialog"
+          class="bg-green-500 text-white text-sm px-2 py-1 rounded"
+          title="保存"
+        >
+          💾
         </button>
       </div>
     </div>
 
-    <!-- ファイル名入力 -->
-    <div class="mb-3">
-      <label class="block mb-1 font-semibold">💾 保存ファイル名（任意）</label>
-      <input
-        type="text"
-        v-model="fileName"
-        placeholder="例：festival-shift"
-        class="border p-1 rounded w-64"
-      />
+    <!-- 📅 カレンダー式日付選択 -->
+    <div class="border rounded p-2 mb-2">
+      <label class="font-semibold text-sm mb-1 block">📅 日付を選択（複数可）</label>
+      <div class="flex flex-wrap gap-1">
+        <input
+          type="date"
+          v-model="tempDate"
+          class="border rounded p-1 text-sm w-40"
+        />
+        <button
+          @click="addDate"
+          class="bg-gray-300 text-xs px-2 py-1 rounded"
+        >
+          ＋追加
+        </button>
+      </div>
+
+      <!-- 選択済み日付一覧 -->
+      <div class="flex flex-wrap mt-2 gap-1 text-sm">
+        <span
+          v-for="(d, index) in selectedDates"
+          :key="index"
+          class="px-2 py-1 bg-blue-100 rounded cursor-pointer hover:bg-blue-200"
+          @click="removeDate(index)"
+        >
+          {{ d }}
+        </span>
+      </div>
     </div>
 
-    <!-- ボタン群 -->
-    <div class="mb-3 flex flex-wrap gap-2">
-      <button
-        @click="createNewShift"
-        class="bg-gray-500 text-white px-3 py-1 rounded"
-        :disabled="store.isLoading"
-      >
-        ＋新規作成
-      </button>
-
-      <button
-        @click="loadShifts"
-        class="bg-blue-500 text-white px-3 py-1 rounded"
-        :disabled="store.isLoading"
-      >
-        🔄 読み込み
-      </button>
-
-      <button
-        @click="saveShifts"
-        class="bg-green-500 text-white px-3 py-1 rounded"
-        :disabled="store.isLoading || loadedShifts.length === 0"
-      >
-        💾 保存
-      </button>
-    </div>
-
-    <!-- 読み込んだシフト表示 -->
+    <!-- 📋 読み込んだシフト -->
     <div v-if="loadedShifts.length > 0">
-      <h3 class="font-semibold mb-2">📋 現在のシフト一覧</h3>
+      <h3 class="font-semibold mb-1 text-sm text-gray-700">シフト一覧</h3>
       <ScrollableRow>
         <ShiftDate
           v-for="shift in loadedShifts"
@@ -73,87 +72,140 @@
       </ScrollableRow>
     </div>
 
-    <div v-else class="text-gray-500">
+    <div v-else class="text-gray-500 text-sm mt-2">
       まだシフトは作成または読み込まれていません。
+    </div>
+
+    <!-- 💾 保存モーダル -->
+    <div
+      v-if="showSaveDialog"
+      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50"
+    >
+      <div class="bg-white rounded-lg p-4 shadow-md w-80">
+        <h3 class="text-md font-bold mb-2">💾 シフトを保存</h3>
+        <input
+          type="text"
+          v-model="fileName"
+          placeholder="保存ファイル名（例：festival-shift）"
+          class="border p-1 rounded w-full mb-3"
+        />
+        <div class="flex justify-end gap-2">
+          <button
+            @click="showSaveDialog = false"
+            class="bg-gray-300 px-3 py-1 rounded"
+          >
+            キャンセル
+          </button>
+          <button
+            @click="saveShifts"
+            class="bg-green-500 text-white px-3 py-1 rounded"
+          >
+            保存
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import ShiftDate from "@/components/shift/ShiftDate.vue";
 import ScrollableRow from "@/components/common/ScrollableRow.vue";
+import { toYMD_JST } from "@/composables/useJST";
 
-// ストア呼び出し
+// ストア
 const store = useShiftStore();
 
 // 状態
-const selectedDates = ref([new Date().toISOString().slice(0, 10)]);
+const selectedDates = ref([]);
+const tempDate = ref("");
 const loadedShifts = ref([]);
-const fileName = ref("shift");
+const fileName = ref("");
+const showSaveDialog = ref(false);
 
-// 日付フィールド追加
-const addDateField = () => {
-  selectedDates.value.push("");
+// ✅ 日付追加
+const addDate = () => {
+  if (!tempDate.value) return;
+  const jstDate = toYMD_JST(new Date(tempDate.value));
+  if (!selectedDates.value.includes(jstDate)) {
+    selectedDates.value.push(jstDate);
+  }
+  tempDate.value = "";
 };
 
-// 🔹 新規作成ボタン
+// ✅ 日付削除
+const removeDate = (index) => {
+  selectedDates.value.splice(index, 1);
+};
+
+// ✅ 新規作成
 const createNewShift = () => {
+  if (selectedDates.value.length === 0) {
+    alert("📅 日付を選択してください。");
+    return;
+  }
   store.createNewShift(selectedDates.value);
   loadedShifts.value = store.shifts;
   alert("✅ 新しいシフトを作成しました。");
 };
 
-// 🔹 読み込みボタン
+// ✅ Firestoreから読み込み
 const loadShifts = async () => {
-  if (!selectedDates.value.length) {
-    alert("⚠️ 日付を1つ以上選択してください。");
+  if (selectedDates.value.length === 0) {
+    alert("📅 日付を選択してください。");
     return;
   }
   store.isLoading = true;
   try {
-    const data = await store.getShiftsByDates(selectedDates.value);
-    if (data.length === 0) {
-      alert("📂 Firestoreに該当するシフトはありません。");
-    } else {
-      loadedShifts.value = data;
-      alert("✅ Firestoreからシフトを読み込みました。");
-    }
+    const result = await store.getShiftsByDates(selectedDates.value);
+    loadedShifts.value = result;
+    if (result.length === 0) alert("📂 Firestoreに該当するシフトはありません。");
+    else alert("✅ シフトを読み込みました。");
   } catch (e) {
-    console.error("シフト読み込みエラー:", e);
-    alert("❌ シフト読み込みに失敗しました。");
+    console.error("❌ シフト読み込みエラー:", e);
+    alert("読み込みに失敗しました。");
   } finally {
     store.isLoading = false;
   }
 };
 
-// 🔹 保存ボタン
-const saveShifts = async () => {
+// ✅ 保存モーダル開く
+const openSaveDialog = () => {
   if (loadedShifts.value.length === 0) {
     alert("⚠️ 保存するシフトがありません。");
+    return;
+  }
+  showSaveDialog.value = true;
+};
+
+// ✅ Firestoreに保存
+const saveShifts = async () => {
+  if (!fileName.value) {
+    alert("⚠️ ファイル名を入力してください。");
     return;
   }
   store.isLoading = true;
   try {
     await store.saveShiftsByDates(loadedShifts.value, fileName.value);
-    alert("✅ シフトをFirestoreに保存しました。");
+    alert("✅ シフトを保存しました。");
   } catch (e) {
-    console.error("シフト保存エラー:", e);
-    alert("❌ シフト保存に失敗しました。");
+    console.error("❌ シフト保存エラー:", e);
+    alert("保存に失敗しました。");
   } finally {
     store.isLoading = false;
+    showSaveDialog.value = false;
   }
 };
-
-// マウント時に日付情報などをロード
-onMounted(() => {
-  store.loadFestivalShifts();
-});
 </script>
 
 <style scoped>
-input[type="date"] {
-  width: 180px;
+button {
+  transition: all 0.2s;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
