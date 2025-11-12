@@ -120,6 +120,7 @@ import { useFirebase } from "@/composables/useFirebase";
 import { doc, setDoc } from "firebase/firestore";
 import { nanoid } from "nanoid";
 import { createMemberModel } from "@/models/shiftModel";
+import { firestoreTimestampJST, toJSTISOStringFromInput } from "@/composables/useJST.js";
 
 const form = ref({
   name_kanji: "",
@@ -152,18 +153,18 @@ const handleSubmit = async () => {
   generatedId.value = id;
 
   const available_dates = scheduleOptions.value
-    .filter(d => d.selected)
-    .map(d => ({
-      date: d.label,
-      timeType: d.timeType,
-      start: d.start,
-      end: d.end,
+    .filter((d) => d.selected)
+    .map((d) => ({
+      label: d.label,
+      start_jst: toJSTISOStringFromInput("2025-11-01", d.start),
+      end_jst: toJSTISOStringFromInput("2025-11-01", d.end),
     }));
 
   const memberData = createMemberModel({
     ...form.value,
     id,
     available_dates,
+    joined_at: firestoreTimestampJST(),
   });
 
   await setDoc(doc(db, "artifacts/setapanmarketcounter/public/data/members", id), memberData);
