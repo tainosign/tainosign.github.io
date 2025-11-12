@@ -170,7 +170,6 @@ const confirmCreate = () => {
   store.createNewShift(selectedDates.value);
   loadedShifts.value = store.shifts;
   isCreating.value = false; // 🔽 作成完了後に非表示へ
-  alert("✅ 新しいシフトを作成しました。");
 };
 
 // ✅ Firestoreから読み込み
