@@ -1,17 +1,9 @@
+// src/composables/counter-logic.js
 import { useFirebase } from "./useFirebase.js";
-// import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { collection, addDoc, doc, setDoc, updateDoc, increment, onSnapshot } from "firebase/firestore";
+import { getJSTDateString, firestoreTimestampJST } from "./useJST.js";
 
 let db, auth, userId;
-
-function getJSTDateYMD() {
-  const now = new Date();
-  const jst = new Date(now.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
-  const y = jst.getFullYear();
-  const m = String(jst.getMonth() + 1).padStart(2, "0");
-  const d = String(jst.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export async function setupCounter(appId) {
   const result = await useFirebase();
@@ -20,41 +12,42 @@ export async function setupCounter(appId) {
   userId = auth.currentUser?.uid || null;
 
   setupRealtimeListener(appId);
-
-  // グローバル登録はしない
 }
 
 export async function logCount(type, count, appId) {
-  if (!db) return; // db 未初期化なら無視
+  if (!db) return;
 
-  const jstYMD = getJSTDateYMD();
-  const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
+  const jstYMD = getJSTDateString();
+  const timestamp = firestoreTimestampJST();
 
   const logRef = collection(db, `/artifacts/${appId}/public/data/log`);
   await addDoc(logRef, {
     type,
     count,
-    timestamp: new Date(timestamp),
+    timestamp,
     event_day: jstYMD,
     user_id: userId,
   });
 
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
-  const updateData = { updatedAt: new Date(timestamp) };
-  if (["in","out","localin","exitin"].includes(type)) updateData[type] = increment(count);
+  const updateData = { updatedAt: timestamp };
+  if (["in", "out", "localin", "exitin"].includes(type)) updateData[type] = increment(count);
 
   await updateDoc(summaryRef, updateData).catch(async () => {
     await setDoc(summaryRef, {
-      in:0, out:0, localin:0, exitin:0,
+      in: 0,
+      out: 0,
+      localin: 0,
+      exitin: 0,
       [type]: count,
-      updatedAt: new Date(timestamp),
+      updatedAt: timestamp,
     });
   });
 }
 
 function setupRealtimeListener(appId) {
   if (!db) return;
-  const jstYMD = getJSTDateYMD();
+  const jstYMD = getJSTDateString();
   const summaryRef = doc(db, `/artifacts/${appId}/public/data/summary/${jstYMD}`);
 
   onSnapshot(summaryRef, (snap) => {
@@ -64,9 +57,9 @@ function setupRealtimeListener(appId) {
     const localEl = document.getElementById("localin-count");
     const exitEl = document.getElementById("exitin-count");
 
-    const current = (d.in||0) + (d.localin||0) + (d.exitin||0) - (d.out||0);
+    const current = (d.in || 0) + (d.localin || 0) + (d.exitin || 0) - (d.out || 0);
     if (currentEl) currentEl.textContent = current;
-    if (localEl) localEl.textContent = d.localin||0;
-    if (exitEl) exitEl.textContent = d.exitin||0;
+    if (localEl) localEl.textContent = d.localin || 0;
+    if (exitEl) exitEl.textContent = d.exitin || 0;
   });
 }
