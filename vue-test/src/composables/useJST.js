@@ -33,16 +33,6 @@ timeZone: "Asia/Tokyo",
 });
 }
 
-// ✅ YYYY-MM-DD形式
-export function toYMD_JST(ts) {
-if (!ts) return "--/--/--";
-const date = ts.toDate ? ts.toDate() : new Date(ts);
-const jst = new Date(date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
-const y = jst.getFullYear();
-const m = String(jst.getMonth() + 1).padStart(2, "0");
-const d = String(jst.getDate()).padStart(2, "0");
-return ${y}-${m}-${d};
-}
 
 /** ---------- 入力・変換 ---------- **/
 
