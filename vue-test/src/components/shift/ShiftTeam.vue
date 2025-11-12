@@ -37,6 +37,4 @@ const store = useShiftStore();
 const addPosition = () => {
   store.addPosition(props.shiftDate, props.team.id);
 };
-</script>  );
-}
 </script>
