@@ -1,104 +1,92 @@
-// ✅ 現在の日本時間を取得
+// vue-test/src/composables/useJST.js
+
+/** ---------- 基本ユーティリティ ---------- **/
+
+// ✅ 現在の日本時間（Dateオブジェクト）
 export function nowJST() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000);
 }
 
-// ✅ 日本時間の日付文字列 (YYYY-MM-DD)
+// ✅ JSTのISO文字列（YYYY-MM-DDTHH:mm:ss）
+export function getJSTISOString() {
+  return nowJST().toISOString().replace("Z", "+09:00");
+}
+
+// ✅ JSTの「日付のみ」文字列
 export function getJSTDateString() {
   return nowJST().toISOString().slice(0, 10);
 }
 
-// ✅ 日本時間の時刻文字列 (HH:mm:ss)
+// ✅ JSTの「時刻のみ」文字列
 export function getJSTTimeString() {
-  const jst = nowJST();
-  return jst.toTimeString().slice(0, 8);
+  return nowJST().toTimeString().slice(0, 8);
 }
 
-// ✅ Firestore の Timestamp を日本時間でフォーマット
-export function toJSTStringFromFirestore(ts) {
-  if (!ts) return "--";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+/** ---------- 入力・変換 ---------- **/
+
+// ✅ 任意の入力（日付文字列やtimestamp）をJST Dateに変換
+export function parseToJSTDate(input) {
+  if (!input) return null;
+  const date = input.toDate ? input.toDate() : new Date(input);
+  // UTC→JST補正
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000);
 }
 
-// ✅ MM/DD形式
-export function toMD_JST(ts) {
-  if (!ts) return "--/--";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return date.toLocaleDateString("ja-JP", {
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Tokyo",
-  });
+// ✅ フォーム入力の date/time 値を JST ISO形式に変換
+export function toJSTISOStringFromInput(dateStr, timeStr) {
+  const base = new Date(`${dateStr}T${timeStr}:00`);
+  return new Date(base.getTime() + 9 * 60 * 60 * 1000).toISOString().replace("Z", "+09:00");
 }
 
-// ✅ YYYY-MM-DD形式
-export function toYMD_JST(ts) {
-  if (!ts) return "--/--/--";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const jst = new Date(date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
-  const y = jst.getFullYear();
-  const m = String(jst.getMonth() + 1).padStart(2, "0");
-  const d = String(jst.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+/** ---------- Firestore用 ---------- **/
 
-// ✅ Firestore用：JST基準のTimestamp生成
+// ✅ Firestore保存用 JST Timestamp（Dateオブジェクトとして保存OK）
 export function firestoreTimestampJST() {
   return new Date(nowJST());
 }
 
-// ✅ JST基準で「日付が変わったか」をチェック（集計リセットなどに利用）
-export function isNewJSTDay(prevTimestamp) {
-  const prev = new Date(prevTimestamp);
-  const prevDate = prev.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
-  const nowDate = nowJST().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
-  return prevDate !== nowDate;
+// ✅ Firestore Timestamp を JST文字列に変換（読み込み時）
+export function toJSTStringFromFirestore(ts, withTime = true) {
+  if (!ts) return "--";
+  const date = parseToJSTDate(ts);
+  return date.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    ...(withTime ? {} : { year: "numeric", month: "2-digit", day: "2-digit" }),
+  });
 }
 
-// ✅ JSTの「時・分・秒」を個別に取得
-export function getJSTParts() {
-  const jst = nowJST();
-  return {
-    year: jst.getFullYear(),
-    month: jst.getMonth() + 1,
-    day: jst.getDate(),
-    hour: jst.getHours(),
-    minute: jst.getMinutes(),
-    second: jst.getSeconds()
-  };
+/** ---------- 表示整形 ---------- **/
+
+// ✅ YYYY-MM-DD
+export function toYMD_JST(ts) {
+  const date = parseToJSTDate(ts);
+  if (!date) return "--/--/--";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-// ✅ JSTの10分単位インデックス（来場者推移グラフなどで使用）
-export function getJSTTenMinuteIndex() {
-  const { hour, minute } = getJSTParts();
-  const index = hour * 6 + Math.floor(minute / 10);
-  return index; // 1日144区分 (0〜143)
+// ✅ HH:mm:ss
+export function toHMS_JST(ts) {
+  const date = parseToJSTDate(ts);
+  if (!date) return "--:--:--";
+  return date.toTimeString().slice(0, 8);
 }
 
-// ✅ JST基準の「日付と10分区分」をセットで返す
-export function getJSTTimeSlotId() {
-  const date = getJSTDateString();
-  const index = getJSTTenMinuteIndex();
-  return `${date}_${index.toString().padStart(3, "0")}`;
-}
+/** ---------- 動的制御系 ---------- **/
 
-// ✅ JST基準の「シフト」時刻判定（勤務中かどうか）
+// ✅ JST基準で現在が指定シフト時間内か判定
 export function isWithinShift(startTime, endTime) {
   const now = nowJST().getTime();
   return now >= new Date(startTime).getTime() && now <= new Date(endTime).getTime();
 }
 
-// ✅ JST基準で「今日・明日・昨日」などの相対関係を返す
-export function compareJSTDate(targetDate) {
-  const today = getJSTDateString();
-  if (targetDate === today) return "today";
-
-  const target = new Date(targetDate);
-  const jst = nowJST();
-  const diff = (target - jst) / (1000 * 60 * 60 * 24);
-
-  if (diff > 0 && diff < 1) return "tomorrow";
-  if (diff < 0 && diff > -1) return "yesterday";
-  return diff > 0 ? "future" : "past";
+// ✅ JST基準で「日付が変わったか」
+export function isNewJSTDay(prevTimestamp) {
+  if (!prevTimestamp) return false;
+  const prev = parseToJSTDate(prevTimestamp);
+  const prevDate = prev.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  const nowDate = nowJST().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  return prevDate !== nowDate;
 }
