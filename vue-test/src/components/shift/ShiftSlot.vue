@@ -2,8 +2,8 @@
   <div class="border rounded p-2 bg-white">
     <!-- 時間帯ヘッダ -->
     <div class="flex justify-between items-center mb-2 text-xs text-gray-600">
-      <div>07:00</div>
-      <div>19:00</div>
+      <div>{{ startHour }}:00</div>
+      <div>{{ endHour }}:00</div>
     </div>
 
     <!-- タイムライン本体 -->
@@ -14,22 +14,28 @@
       @drop.prevent="onDrop"
     >
       <!-- 10分目盛 -->
-      <div v-for="(t, i) in timeLabels" :key="i" :style="{ top: `${(i/(timeLabels.length-1))*100}%` }"
-           class="absolute left-1/2 w-full -translate-x-1/2 text-[10px] text-gray-400 pointer-events-none">
+      <div
+        v-for="(t, i) in timeLabels"
+        :key="i"
+        :style="{ top: `${(i / (timeLabels.length - 1)) * 100}%` }"
+        class="absolute left-1/2 w-full -translate-x-1/2 text-[10px] text-gray-400 pointer-events-none"
+      >
         <div class="absolute -left-8 text-xs">{{ t }}</div>
         <div class="h-[1px] bg-gray-200 w-full"></div>
       </div>
 
-      <!-- ブロック（割当） -->
+      <!-- 割当ブロック -->
       <div
         v-for="block in localSlots"
         :key="block.id"
-        class="absolute left-12 right-3 bg-white border rounded shadow-sm p-1 text-xs"
+        class="absolute left-12 right-3 bg-white border rounded shadow-sm p-1 text-xs cursor-move select-none"
         :style="blockStyle(block)"
+        draggable="true"
+        @dragstart="onDragStart(block, $event)"
         @mousedown.prevent="selectBlock(block, $event)"
       >
         <div class="flex justify-between items-center">
-          <div class="font-semibold truncate">{{ block.memberName || '未割当' }}</div>
+          <div class="font-semibold truncate">{{ block.memberName || "未割当" }}</div>
           <div class="text-[11px] text-gray-500">{{ formatBlockTime(block) }}</div>
         </div>
 
@@ -41,36 +47,39 @@
       </div>
     </div>
 
-    <!-- 選択ブロックの簡易調整表示 -->
+    <!-- 選択ブロックの情報 -->
     <div v-if="selectedBlock" class="mt-2 text-sm">
-      <div>選択中: <strong>{{ selectedBlock.memberName || '未割当' }}</strong></div>
-      <div class="text-xs text-gray-600">開始: {{ minutesToHHMM(selectedBlock.start_min) }} / 長さ: {{ selectedBlock.duration_min }}分</div>
+      <div>選択中: <strong>{{ selectedBlock.memberName || "未割当" }}</strong></div>
+      <div class="text-xs text-gray-600">
+        開始: {{ minutesToHHMM(selectedBlock.start_min) }} /
+        長さ: {{ selectedBlock.duration_min }}分
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
-import { toYMD_JST } from "@/composables/useJST.js"; // もし日付変換が必要なら
+import { ref, computed, watch } from "vue";
 
 const props = defineProps({
   position: { type: Object, required: true },
-  slots: { type: Array, default: () => [] }, // array of blocks { id, memberId, memberName, start_min, duration_min }
+  slots: { type: Array, default: () => [] },
 });
-const emit = defineEmits(["update-slots"]);
+
+const emit = defineEmits([
+  "update-slots",
+  "copy-block",
+  "move-block",
+]);
 
 const timelineRef = ref(null);
-
-// timeline settings
 const startHour = 7;
 const endHour = 19;
 const totalMinutes = (endHour - startHour) * 60;
-const gridUnit = 10; // 10 minutes grid
+const gridUnit = 10;
 
-// local copy to allow UI edits then emit
 const localSlots = ref((props.slots || []).map(s => ({ ...s })));
 
-// recompute time labels (every hour)
 const timeLabels = computed(() => {
   const arr = [];
   for (let h = startHour; h <= endHour; h++) {
@@ -83,37 +92,55 @@ function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
+/**
+ * Drop時処理：単一・複数メンバーどちらにも対応
+ */
 function onDrop(e) {
   try {
-    const data = e.dataTransfer.getData("application/json");
-    const member = JSON.parse(data);
+    const data = JSON.parse(e.dataTransfer.getData("application/json"));
+    const members = Array.isArray(data) ? data : [data];
     const rect = timelineRef.value.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const minutesFromTop = Math.round((y / rect.height) * totalMinutes / gridUnit) * gridUnit;
     const start_min = startHour * 60 + minutesFromTop;
-    const block = {
-      id: `blk_${Date.now()}`,
-      memberId: member.id || member.uid || null,
-      memberName: member.name_kanji || member.name || "メンバー",
-      start_min,
-      duration_min: 60,
-    };
-    localSlots.value.push(block);
+
+    members.forEach((member, idx) => {
+      const block = {
+        id: `blk_${Date.now()}_${idx}`,
+        memberId: member.id || member.uid || null,
+        memberName: member.name_kanji || member.name || "メンバー",
+        start_min,
+        duration_min: 60,
+        originDate: member.originDate || null,
+        originTeamId: member.originTeamId || null,
+        originPositionId: member.originPositionId || null,
+      };
+      localSlots.value.push(block);
+    });
     emit("update-slots", localSlots.value);
   } catch (err) {
     console.error("drop parse error:", err);
   }
 }
 
+function onDragStart(block, e) {
+  const data = JSON.stringify({
+    type: "slot-block",
+    ...block,
+    originPositionId: props.position.positionId,
+  });
+  e.dataTransfer.setData("application/json", data);
+}
+
+/**
+ * 表示上の位置・高さを計算
+ */
 function blockStyle(block) {
-  const rect = timelineRef.value?.getBoundingClientRect();
   const topRatio = (block.start_min - startHour * 60) / totalMinutes;
   const heightRatio = block.duration_min / totalMinutes;
-  const top = Math.max(0, topRatio * 100);
-  const height = Math.max(2, heightRatio * 100);
   return {
-    top: `${top}%`,
-    height: `${height}%`,
+    top: `${Math.max(0, topRatio * 100)}%`,
+    height: `${Math.max(2, heightRatio * 100)}%`,
   };
 }
 
@@ -130,31 +157,32 @@ function formatBlockTime(block) {
 }
 
 function changeDuration(block, delta) {
-  // increase/decrease in gridUnit increment
-  block.duration_min = Math.max(gridUnit, Math.round((block.duration_min + delta) / gridUnit) * gridUnit);
+  block.duration_min = Math.max(
+    gridUnit,
+    Math.round((block.duration_min + delta) / gridUnit) * gridUnit
+  );
   emit("update-slots", localSlots.value);
 }
 
 function removeBlock(id) {
-  localSlots.value = localSlots.value.filter(b => b.id !== id);
+  localSlots.value = localSlots.value.filter((b) => b.id !== id);
   emit("update-slots", localSlots.value);
 }
 
 const selectedBlock = ref(null);
-function selectBlock(block, ev) {
+function selectBlock(block) {
   selectedBlock.value = block;
-  // support dragging the block vertically to change start time? (not implemented)
 }
 
-// keep localSlots in sync when parent prop updates
-// (lightweight; deep copy)
 watch(
   () => props.slots,
-  (v) => { localSlots.value = (v || []).map(s => ({ ...s })); },
+  (v) => {
+    localSlots.value = (v || []).map((s) => ({ ...s }));
+  },
   { deep: true }
 );
 </script>
 
 <style scoped>
-/* 高さ720px = 12時間 -> 60px / hour, 10min -> 10px approx depending */
+/* 高さ720px = 12時間分。10分単位なら1時間=60px相当 */
 </style>
