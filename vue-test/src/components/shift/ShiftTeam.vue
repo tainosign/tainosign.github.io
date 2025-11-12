@@ -1,90 +1,72 @@
 <template>
-  <div class="p-3 my-2 border rounded-lg bg-gray-50">
-    <div class="flex justify-between items-center mb-2">
-      <h4 class="font-semibold text-gray-700">
-        チーム: {{ team.name || team.teamId }}
-      </h4>
-      <button
-        @click="addPosition"
-        class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-md text-sm"
-      >
-        + ポジション
-      </button>
+  <div class="min-w-[300px] bg-gray-50 border rounded p-3">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="font-semibold text-gray-800">{{ team.name }}</div>
+        <div class="text-xs text-gray-500">ID: {{ team.id }}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="addPosition" class="bg-blue-500 text-white text-xs px-2 py-1 rounded">＋ポジション</button>
+        <button @click="removeTeam" class="bg-red-500 text-white text-xs px-2 py-1 rounded">削除</button>
+      </div>
     </div>
 
-    <p v-if="positions.length === 0" class="text-gray-400 text-sm">
-      まだポジションがありません
-    </p>
-
-    <ShiftPosition
-      v-for="position in positions"
-      :key="position.positionId"
-      :date-id="dateId"
-      :team-id="team.teamId"
-      :position="position"
-      @update="updatePosition"
-      @delete="deletePosition"
-    />
+    <div class="flex gap-2 overflow-x-auto py-1">
+      <div
+        v-for="position in positions"
+        :key="position.positionId"
+        class="w-[360px] shrink-0"
+      >
+        <ShiftPosition
+          :date-id="shiftDay"
+          :team-id="team.id"
+          :position="position"
+          @update-position="updatePosition"
+          @delete-position="deletePosition"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, watch } from "vue";
+<script setup>
 import ShiftPosition from "./ShiftPosition.vue";
+import { useShiftStore } from "@/stores/shiftStore";
+import { reactive } from "vue";
 
-interface Slot {
-  slotId: string;
-  time: string;
-  member: string | null;
-}
+const props = defineProps({
+  shiftDay: { type: String, required: false, default: '' },
+  team: { type: Object, required: true },
+});
 
-interface Position {
-  positionId: string;
-  name: string;
-  slots: Slot[];
-}
+const emit = defineEmits(["update-team", "delete-team"]);
+const store = useShiftStore();
 
-interface Team {
-  teamId: string;
-  name: string;
-  positions: Position[];
-}
-
-const props = defineProps<{
-  dateId: string;
-  team: Team;
-}>();
-
-const emit = defineEmits<{
-  (e: "update", team: Team): void;
-}>();
-
-const positions = ref<Position[]>(props.team.positions || []);
-
-watch(
-  positions,
-  () => {
-    emit("update", { ...props.team, positions: positions.value });
-  },
-  { deep: true }
-);
+const positions = reactive(props.team.positions || []);
 
 function addPosition() {
-  const newPosition: Position = {
+  const newPos = {
     positionId: `pos_${Date.now()}`,
-    name: `新しいポジション ${positions.value.length + 1}`,
+    name: `ポジション ${positions.length + 1}`,
+    // slots will be managed inside ShiftSlot (assignments)
     slots: [],
   };
-  positions.value.push(newPosition);
+  positions.push(newPos);
+  emit("update-team", { ...props.team, positions: positions });
 }
 
-function deletePosition(positionId: string) {
-  positions.value = positions.value.filter((p) => p.positionId !== positionId);
+function deletePosition(positionId) {
+  const updated = positions.filter(p => p.positionId !== positionId);
+  emit("update-team", { ...props.team, positions: updated });
 }
 
-function updatePosition(updatedPosition: Position) {
-  positions.value = positions.value.map((p) =>
-    p.positionId === updatedPosition.positionId ? updatedPosition : p
-  );
+function updatePosition(updatedPosition) {
+  const updated = positions.map(p => (p.positionId === updatedPosition.positionId ? updatedPosition : p));
+  emit("update-team", { ...props.team, positions: updated });
+}
+
+function removeTeam() {
+  if (!confirm("このチームを削除しますか？")) return;
+  emit("delete-team", props.team.id);
 }
 </script>
