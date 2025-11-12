@@ -22,6 +22,28 @@ export function getJSTTimeString() {
   return nowJST().toTimeString().slice(0, 8);
 }
 
+// ✅ MM/DD形式
+export function toMD_JST(ts) {
+if (!ts) return "--/--";
+const date = ts.toDate ? ts.toDate() : new Date(ts);
+return date.toLocaleDateString("ja-JP", {
+month: "2-digit",
+day: "2-digit",
+timeZone: "Asia/Tokyo",
+});
+}
+
+// ✅ YYYY-MM-DD形式
+export function toYMD_JST(ts) {
+if (!ts) return "--/--/--";
+const date = ts.toDate ? ts.toDate() : new Date(ts);
+const jst = new Date(date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }));
+const y = jst.getFullYear();
+const m = String(jst.getMonth() + 1).padStart(2, "0");
+const d = String(jst.getDate()).padStart(2, "0");
+return ${y}-${m}-${d};
+}
+
 /** ---------- 入力・変換 ---------- **/
 
 // ✅ 任意の入力（日付文字列やtimestamp）をJST Dateに変換
