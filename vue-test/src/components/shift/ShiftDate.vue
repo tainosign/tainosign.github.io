@@ -1,8 +1,11 @@
 <template>
-  <div>
-    <!-- 各日付のシフト -->
+  <div class="p-2">
+    <!-- 複数日付の読み込み・保存 -->
+
+    <!-- 各日付のシフト一覧 -->
     <div v-for="shift in shiftStore.shifts" :key="shift.date" class="mb-4">
       <ShiftContainer :item="shift" :list="shiftStore.shifts">
+        <!-- ヘッダー -->
         <template #header>
           <div class="flex items-center gap-2">
             <span class="font-bold">{{ shift.date }}</span>
@@ -15,6 +18,7 @@
           </div>
         </template>
 
+        <!-- ボディ -->
         <template #body>
           <ScrollableRow>
             <ShiftTeam
@@ -31,13 +35,20 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import ShiftContainer from "./ShiftContainer.vue";
 import ShiftTeam from "./ShiftTeam.vue";
 import ScrollableRow from "../common/ScrollableRow.vue";
-import { createTeam } from "@/models/shiftModel";
+import { createTeam, createShift } from "@/models/shiftModel";
 
+const shiftStore = useShiftStore();
+const newDate = ref("");
+
+// チーム追加
 const addTeam = (shift) => {
   shift.teams.push(createTeam());
 };
+
+
 </script>
