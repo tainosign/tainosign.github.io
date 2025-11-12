@@ -1,7 +1,7 @@
 <!-- src/views/ShiftCreateView.vue -->
 <template>
   <div class="p-2">
-    <div class="flex items-center justify-between mb-2">
+    <div class="flex items-center justify-start mb-2">
       <h2 class="text-lg font-bold">🗓 シフト作成</h2>
 
       <!-- コンパクト操作ボタン群 -->
