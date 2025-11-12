@@ -4,6 +4,8 @@
     :class="{ 'opacity-70 bg-gray-100': item.locked }"
     :style="containerStyle"
     draggable="true"
+    @dragstart="onDragStart"
+    @dragend="onDragEnd"
   >
     <div class="flex justify-between items-center mb-1">
       <template v-if="!item.folded">
@@ -13,13 +15,11 @@
       </template>
 
       <div class="flex gap-1 items-center">
-        <!-- 折りたたみトグル -->
         <button @click="toggleFold" class="text-xs bg-gray-100 px-2 py-1 rounded">
           {{ item.folded ? "＋" : "－" }}
         </button>
 
         <template v-if="!item.folded">
-          <!-- ロックボタン -->
           <button
             @click="toggleLock"
             class="text-xs px-2 py-1 rounded"
@@ -28,27 +28,13 @@
             {{ item.locked ? '🔒' : '🔓' }}
           </button>
 
-          <!-- 複製ボタン -->
-          <button
-            @click="duplicate(list)"
-            class="text-xs bg-gray-100 px-2 py-1 rounded"
-          >
-            📄
-          </button>
+          <button @click="duplicateItem" class="text-xs bg-gray-100 px-2 py-1 rounded">📄</button>
 
-          <!-- 削除ボタン：ロック中は非表示 -->
-          <button
-            v-if="!item.locked"
-            @click="remove(list)"
-            class="text-xs bg-red-100 px-2 py-1 rounded"
-          >
-            ✖
-          </button>
+          <button v-if="!item.locked" @click="removeItem" class="text-xs bg-red-100 px-2 py-1 rounded">✖</button>
         </template>
       </div>
     </div>
 
-    <!-- 本体部分 -->
     <transition name="fade">
       <div v-show="!item.folded" class="mt-1 overflow-visible">
         <slot name="body"></slot>
@@ -60,29 +46,47 @@
 <script setup>
 import { computed } from "vue";
 import { useShiftItem } from "@/composables/useShiftItem";
+import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
   item: Object,
   list: Array,
+  type: { type: String, default: "generic" }, // "team", "position", "slot"
 });
 
-const { toggleLock, toggleFold, duplicate, remove } = useShiftItem(props.item);
+const store = useShiftStore();
+const { toggleLock, toggleFold } = useShiftItem(props.item);
 
-// 横幅のみ可変に
 const containerStyle = computed(() => {
-  if (props.item.folded) {
-    return {
-      width: "80px",
-      transition: "width 0.3s ease",
-      overflowY: "visible",
-    };
-  }
   return {
-    width: "100%",
+    width: props.item.folded ? "80px" : "100%",
     transition: "width 0.3s ease",
     overflowY: "visible",
   };
 });
+
+// 共通操作
+const duplicateItem = () => {
+  if (props.type === "team") store.duplicateTeam(props.list[0]?.date, props.item.id);
+  if (props.type === "position") store.duplicatePosition(props.list[0]?.teamId, props.item.positionId);
+  // slotは基本UIで複製可能
+};
+
+const removeItem = () => {
+  if (props.type === "team") store.removeTeam(props.list[0]?.date, props.item.id);
+  if (props.type === "position") store.removePosition(props.list[0]?.teamId, props.item.positionId);
+  // slotは基本UIで削除可能
+};
+
+// ドラッグ対応
+const onDragStart = (e) => {
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("application/json", JSON.stringify(props.item));
+};
+
+const onDragEnd = () => {
+  // 必要であればドラッグ終了後の処理
+};
 </script>
 
 <style scoped>
