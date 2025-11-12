@@ -1,121 +1,53 @@
 <template>
-  <div class="p-2 my-2 border border-gray-200 rounded-md bg-white shadow-sm">
-    <div class="flex justify-between items-center mb-2">
-      <input
-        v-model="positionName"
-        type="text"
-        placeholder="ポジション名を入力"
-        class="border px-2 py-1 rounded text-sm w-2/3"
-      />
+  <div class="p-2 border rounded-md bg-white">
+    <div class="flex items-center justify-between mb-2">
+      <input v-model="name" class="px-2 py-1 border rounded text-sm w-2/3" />
       <div class="flex gap-2">
-        <button
-          @click="addSlot"
-          class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-md text-sm"
-        >
-          + スロット
-        </button>
-        <button
-          @click="$emit('delete', position.positionId)"
-          class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-md text-sm"
-        >
-          削除
-        </button>
+        <button @click="addEmptyBlock" class="bg-green-500 text-white text-xs px-2 py-1 rounded">＋ブロック</button>
+        <button @click="$emit('delete', position.positionId)" class="bg-red-500 text-white text-xs px-2 py-1 rounded">削除</button>
       </div>
     </div>
 
-    <p v-if="slots.length === 0" class="text-gray-400 text-sm ml-2">
-      スロットがありません
-    </p>
-
-    <div class="grid grid-cols-2 gap-2">
-      <div
-        v-for="slot in slots"
-        :key="slot.slotId"
-        class="border rounded-md p-2 text-sm bg-gray-50 flex justify-between items-center"
-      >
-        <div>
-          <span class="font-medium">{{ slot.time }}</span>
-          <span v-if="slot.member" class="text-gray-500 ml-2">
-            ({{ slot.member }})
-          </span>
-        </div>
-        <div class="flex gap-1">
-          <button
-            @click="editSlot(slot.slotId)"
-            class="text-blue-500 text-xs underline"
-          >
-            編集
-          </button>
-          <button
-            @click="deleteSlot(slot.slotId)"
-            class="text-red-500 text-xs underline"
-          >
-            削除
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 時間軸（ShiftSlot） -->
+    <ShiftSlot
+      :position="position"
+      :slots="slots"
+      @update-slots="onSlotsUpdate"
+    />
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, watch } from "vue";
+import ShiftSlot from "./ShiftSlot.vue";
 
-interface Slot {
-  slotId: string;
-  time: string;
-  member: string | null;
-}
+const props = defineProps({
+  dateId: String,
+  teamId: String,
+  position: { type: Object, required: true },
+});
 
-interface Position {
-  positionId: string;
-  name: string;
-  slots: Slot[];
-}
+const emit = defineEmits(["update-position", "delete"]);
 
-const props = defineProps<{
-  dateId: string;
-  teamId: string;
-  position: Position;
-}>();
+const name = ref(props.position.name || "");
+const slots = ref(props.position.slots || []);
 
-const emit = defineEmits<{
-  (e: "update", position: Position): void;
-  (e: "delete", positionId: string): void;
-}>();
+watch([name, slots], () => {
+  emit("update-position", { ...props.position, name: name.value, slots: slots.value });
+}, { deep: true });
 
-const positionName = ref(props.position.name || "");
-const slots = ref<Slot[]>(props.position.slots || []);
-
-watch(
-  [positionName, slots],
-  () => {
-    emit("update", {
-      ...props.position,
-      name: positionName.value,
-      slots: slots.value,
-    });
-  },
-  { deep: true }
-);
-
-function addSlot() {
-  const newSlot: Slot = {
-    slotId: `slot_${Date.now()}`,
-    time: "10:00",
-    member: null,
+function addEmptyBlock() {
+  const block = {
+    id: `blk_${Date.now()}`,
+    memberId: null,
+    memberName: null,
+    start_min: 7 * 60,   // default 07:00 in minutes
+    duration_min: 60,    // default 60 minutes
   };
-  slots.value.push(newSlot);
+  slots.value.push(block);
 }
 
-function deleteSlot(slotId: string) {
-  slots.value = slots.value.filter((s) => s.slotId !== slotId);
-}
-
-function editSlot(slotId: string) {
-  const slot = slots.value.find((s) => s.slotId === slotId);
-  if (!slot) return;
-  const newTime = prompt("新しい時間を入力（例: 09:30）", slot.time);
-  if (newTime) slot.time = newTime;
+function onSlotsUpdate(newSlots) {
+  slots.value = newSlots;
 }
 </script>
