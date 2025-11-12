@@ -1,68 +1,51 @@
 <template>
-  <div class="p-2 border rounded bg-white min-w-[280px] shadow-sm">
-    <div class="flex justify-between items-center mb-2">
-      <input
-        v-model="positionName"
-        placeholder="ポジション名"
-        class="border rounded px-2 py-1 text-sm"
-      />
-      <button
-        @click="addSlot"
-        class="bg-green-500 text-white text-xs px-2 py-1 rounded"
-      >
-        ＋スロット
-      </button>
-    </div>
+  <ShiftContainer :item="position" :list="[position]" type="position">
+    <template #header>
+      <div class="flex justify-between items-center mb-2">
+        <input v-model="positionName"
+               class="border rounded px-2 py-1 text-sm"
+               placeholder="ポジション名"/>
+        <button @click="addSlot"
+                class="bg-green-500 text-white text-xs px-2 py-1 rounded">
+          ＋スロット
+        </button>
+      </div>
+    </template>
 
-    <div class="flex flex-col gap-2">
-      <ShiftSlot
-        v-for="slot in slots"
-        :key="slot.slotId"
-        :slot="slot"
-        :slots="slots"
-        @update="updateSlot"
-        @delete="deleteSlot"
-      />
-    </div>
-  </div>
+    <template #body>
+      <div class="flex flex-col gap-2">
+        <ShiftSlot v-for="slot in position.slots"
+                   :key="slot.slotId"
+                   :shift-date="shiftDate"
+                   :team-id="teamId"
+                   :position-id="position.positionId"
+                   :slot="slot"/>
+      </div>
+    </template>
+  </ShiftContainer>
 </template>
 
 <script setup>
 import { ref, watch } from "vue";
+import ShiftContainer from "./ShiftContainer.vue";
 import ShiftSlot from "./ShiftSlot.vue";
+import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
+  shiftDate: String,
+  teamId: String,
   position: Object,
 });
 
-const emit = defineEmits(["update", "delete"]);
+const store = useShiftStore();
 
 const positionName = ref(props.position.name || "");
-const slots = ref(props.position.slots || []);
 
-watch([positionName, slots], () => {
-  emit("update", {
-    ...props.position,
-    name: positionName.value,
-    slots: slots.value,
-  });
+watch(positionName, (v) => {
+  props.position.name = v;
 });
 
-function addSlot() {
-  slots.value.push({
-    slotId: `slot_${Date.now()}`,
-    name: `スロット ${slots.value.length + 1}`,
-    members: [],
-  });
-}
-
-function deleteSlot(id) {
-  slots.value = slots.value.filter((s) => s.slotId !== id);
-}
-
-function updateSlot(updatedSlot) {
-  slots.value = slots.value.map((s) =>
-    s.slotId === updatedSlot.slotId ? updatedSlot : s
-  );
-}
+const addSlot = () => {
+  store.addSlot(props.shiftDate, props.teamId, props.position.positionId);
+};
 </script>
