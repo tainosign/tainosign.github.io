@@ -1,34 +1,42 @@
 <template>
-  <div class="border rounded p-2 bg-white">
-    <!-- 時間帯ヘッダ -->
-    <div class="flex justify-between items-center mb-2 text-xs text-gray-600">
-      <div>{{ startHour }}:00</div>
-      <div>{{ endHour }}:00</div>
-    </div>
+  <div class="border rounded p-2 bg-white relative">
+    <!-- タイムラインヘッダ -->
+    <div class="text-xs text-gray-600 font-semibold mb-1">タイムライン（7:00〜19:00）</div>
 
     <!-- タイムライン本体 -->
     <div
-      class="relative bg-gray-50 border h-[720px] overflow-hidden"
+      class="relative bg-gray-50 border h-[720px] overflow-y-auto overflow-x-hidden"
       ref="timelineRef"
       @dragover.prevent="onDragOver"
       @drop.prevent="onDrop"
     >
-      <!-- 10分目盛 -->
+      <!-- 10分ごとの目盛線と時刻表示 -->
       <div
         v-for="(t, i) in timeLabels"
         :key="i"
         :style="{ top: `${(i / (timeLabels.length - 1)) * 100}%` }"
-        class="absolute left-1/2 w-full -translate-x-1/2 text-[10px] text-gray-400 pointer-events-none"
+        class="absolute left-0 w-full text-[10px] text-gray-400 select-none"
       >
-        <div class="absolute -left-8 text-xs">{{ t }}</div>
-        <div class="h-[1px] bg-gray-200 w-full"></div>
+        <!-- 時間ラベル -->
+        <div
+          class="absolute -left-12 w-10 text-right pr-1 text-xs text-gray-500"
+          :style="{ transform: 'translateY(-50%)' }"
+        >
+          {{ t }}
+        </div>
+        <!-- メモリ線 -->
+        <div
+          class="h-[1px]"
+          :class="t.endsWith(':00') ? 'bg-gray-400' : 'bg-gray-200'"
+          style="width: calc(100% - 40px); margin-left: 40px;"
+        ></div>
       </div>
 
-      <!-- 割当ブロック -->
+      <!-- ブロック（メンバー割当） -->
       <div
         v-for="block in localSlots"
         :key="block.id"
-        class="absolute left-12 right-3 bg-white border rounded shadow-sm p-1 text-xs cursor-move select-none"
+        class="absolute left-14 right-3 bg-white border rounded shadow-sm p-1 text-xs cursor-move select-none"
         :style="blockStyle(block)"
         draggable="true"
         @dragstart="onDragStart(block, $event)"
@@ -47,12 +55,11 @@
       </div>
     </div>
 
-    <!-- 選択ブロックの情報 -->
+    <!-- 選択ブロック情報 -->
     <div v-if="selectedBlock" class="mt-2 text-sm">
       <div>選択中: <strong>{{ selectedBlock.memberName || "未割当" }}</strong></div>
       <div class="text-xs text-gray-600">
-        開始: {{ minutesToHHMM(selectedBlock.start_min) }} /
-        長さ: {{ selectedBlock.duration_min }}分
+        開始: {{ minutesToHHMM(selectedBlock.start_min) }} / 長さ: {{ selectedBlock.duration_min }}分
       </div>
     </div>
   </div>
@@ -63,27 +70,29 @@ import { ref, computed, watch } from "vue";
 
 const props = defineProps({
   position: { type: Object, required: true },
-  slots: { type: Array, default: () => [] },
+  slots: { type: Array, default: () => [] }, // array of blocks { id, memberId, memberName, start_min, duration_min }
 });
-
-const emit = defineEmits([
-  "update-slots",
-  "copy-block",
-  "move-block",
-]);
+const emit = defineEmits(["update-slots"]);
 
 const timelineRef = ref(null);
+
+// timeline settings
 const startHour = 7;
 const endHour = 19;
 const totalMinutes = (endHour - startHour) * 60;
-const gridUnit = 10;
+const gridUnit = 10; // 10分刻み
 
-const localSlots = ref((props.slots || []).map(s => ({ ...s })));
+// local copy
+const localSlots = ref((props.slots || []).map((s) => ({ ...s })));
 
+// 10分刻みで時刻ラベルを生成
 const timeLabels = computed(() => {
   const arr = [];
   for (let h = startHour; h <= endHour; h++) {
-    arr.push(`${String(h).padStart(2, "0")}:00`);
+    for (let m = 0; m < 60; m += gridUnit) {
+      if (h === endHour && m > 0) break;
+      arr.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
   }
   return arr;
 });
@@ -92,55 +101,36 @@ function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
-/**
- * Drop時処理：単一・複数メンバーどちらにも対応
- */
 function onDrop(e) {
   try {
-    const data = JSON.parse(e.dataTransfer.getData("application/json"));
-    const members = Array.isArray(data) ? data : [data];
+    const data = e.dataTransfer.getData("application/json");
+    const member = JSON.parse(data);
     const rect = timelineRef.value.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const minutesFromTop = Math.round((y / rect.height) * totalMinutes / gridUnit) * gridUnit;
     const start_min = startHour * 60 + minutesFromTop;
-
-    members.forEach((member, idx) => {
-      const block = {
-        id: `blk_${Date.now()}_${idx}`,
-        memberId: member.id || member.uid || null,
-        memberName: member.name_kanji || member.name || "メンバー",
-        start_min,
-        duration_min: 60,
-        originDate: member.originDate || null,
-        originTeamId: member.originTeamId || null,
-        originPositionId: member.originPositionId || null,
-      };
-      localSlots.value.push(block);
-    });
+    const block = {
+      id: `blk_${Date.now()}`,
+      memberId: member.id || member.uid || null,
+      memberName: member.name_kanji || member.name || "メンバー",
+      start_min,
+      duration_min: 60,
+    };
+    localSlots.value.push(block);
     emit("update-slots", localSlots.value);
   } catch (err) {
     console.error("drop parse error:", err);
   }
 }
 
-function onDragStart(block, e) {
-  const data = JSON.stringify({
-    type: "slot-block",
-    ...block,
-    originPositionId: props.position.positionId,
-  });
-  e.dataTransfer.setData("application/json", data);
-}
-
-/**
- * 表示上の位置・高さを計算
- */
 function blockStyle(block) {
   const topRatio = (block.start_min - startHour * 60) / totalMinutes;
   const heightRatio = block.duration_min / totalMinutes;
+  const top = Math.max(0, topRatio * 100);
+  const height = Math.max(2, heightRatio * 100);
   return {
-    top: `${Math.max(0, topRatio * 100)}%`,
-    height: `${Math.max(2, heightRatio * 100)}%`,
+    top: `${top}%`,
+    height: `${height}%`,
   };
 }
 
@@ -157,10 +147,7 @@ function formatBlockTime(block) {
 }
 
 function changeDuration(block, delta) {
-  block.duration_min = Math.max(
-    gridUnit,
-    Math.round((block.duration_min + delta) / gridUnit) * gridUnit
-  );
+  block.duration_min = Math.max(gridUnit, Math.round((block.duration_min + delta) / gridUnit) * gridUnit);
   emit("update-slots", localSlots.value);
 }
 
@@ -170,7 +157,7 @@ function removeBlock(id) {
 }
 
 const selectedBlock = ref(null);
-function selectBlock(block) {
+function selectBlock(block, ev) {
   selectedBlock.value = block;
 }
 
@@ -184,5 +171,10 @@ watch(
 </script>
 
 <style scoped>
-/* 高さ720px = 12時間分。10分単位なら1時間=60px相当 */
+/* タイムラインは縦方向に時間が進む構造 */
+.timeline {
+  position: relative;
+  height: 720px;
+  overflow-y: auto;
+}
 </style>
