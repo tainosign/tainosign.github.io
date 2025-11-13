@@ -26,14 +26,18 @@ export const useShiftStore = defineStore("shiftStore", () => {
     activeDay.value = date;
   };
 
-  const createNewShift = (dates) => {
-    const newShifts = dates.map((date) => ({
-      id: `${date}-${Date.now()}`,
-      date,
-      teams: [],
-    }));
-    shifts.value.push(...newShifts);
-  };
+const createNewShift = (dates) => {
+  for (const date of dates) {
+    // 既に同じ日付が存在するかチェック
+    if (!shifts.value.some(s => s.date === date)) {
+      shifts.value.push({
+        id: `${date}-${Date.now()}`,
+        date,
+        teams: [],
+      });
+    }
+  }
+};
 
   const getShiftsByDates = async (dates) => {
     const { getShiftByDate } = await useFirestoreShifts();
