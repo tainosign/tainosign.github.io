@@ -153,10 +153,25 @@ const confirmCreate = async () => {
     alert("📅 日付を1つ以上選択してください。");
     return;
   }
-  store.createNewShift(selectedDates.value);
-  loadedShifts.value = [...store.shifts];
-  isCreating.value = false;
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+
+  try {
+    // ここで store に直接作成（重複日付はスキップ）
+    store.createNewShift(selectedDates.value);
+
+    // loadedShifts は store.shifts の参照だけにする
+    loadedShifts.value = store.shifts;
+  } catch (err) {
+    console.error(err);
+    alert("作成に失敗しました。");
+  } finally {
+    isProcessing.value = false;
+    isCreating.value = false;
+    selectedDates.value = [];
+  }
 };
+
 
 // ✅ Firestore読み込み
 const loadShifts = async () => {
