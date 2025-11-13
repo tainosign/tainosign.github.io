@@ -57,7 +57,7 @@
 
       <!-- 参加回数 -->
       <div>
-        <label>参加回数*</label>
+        <label>今回の応募を含めた参加回数*</label>
         <select v-model="form.participation_history" required class="input">
           <option disabled value="">選択してください</option>
           <option v-for="n in 16" :key="n">{{ n === 1 ? '初めて' : n + '回目' }}</option>
