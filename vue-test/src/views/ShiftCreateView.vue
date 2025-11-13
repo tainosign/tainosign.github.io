@@ -135,6 +135,7 @@ const loadedShifts = ref([]);
 const fileName = ref("");
 const showSaveDialog = ref(false);
 const isCreating = ref(false); // ✅ 追加：新規作成モード制御
+  const isProcessing = ref(false); // ボタン処理中フラグ（重複防止） 
 
 // 🔄 新規作成モード切り替え
 const toggleCreateMode = () => {
