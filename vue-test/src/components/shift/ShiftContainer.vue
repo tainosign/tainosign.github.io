@@ -3,42 +3,46 @@
     class="border rounded p-1 bg-white shadow-sm mb-1 transition-all duration-200 flex-shrink-0"
     :class="{ 'opacity-70 bg-gray-100': item.locked }"
     :style="containerStyle"
-    draggable="true"
-    @dragstart="onDragStart"
-    @dragend="onDragEnd"
   >
-    <div class="flex justify-between items-center mb-0.5">
+    <!-- ドラッグハンドル（ここだけドラッグ可能） -->
+    <div
+      class="flex justify-between items-center mb-0.5 cursor-move select-none"
+      draggable="true"
+      @dragstart="onDragStart"
+      @dragend="onDragEnd"
+    >
       <template v-if="!item.folded">
         <slot name="header">
           <span class="font-bold text-xs">{{ item.name }}</span>
         </slot>
       </template>
 
-      <div class="flex gap-0.5 items-center">
-        <button @click="toggleFold" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">
+      <div class="flex gap-0.5 items-center cursor-default">
+        <button @click.stop="toggleFold" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">
           {{ item.folded ? "＋" : "－" }}
         </button>
 
         <template v-if="!item.folded">
           <button
-            @click="toggleLock"
+            @click.stop="toggleLock"
             class="text-[10px] px-1 py-0.5 rounded"
             :class="item.locked ? 'bg-gray-400 text-white' : 'bg-gray-100'"
           >
             {{ item.locked ? '🔒' : '🔓' }}
           </button>
 
-          <button @click="duplicateItem" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
+          <button @click.stop="duplicateItem" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
 
           <button
             v-if="!item.locked"
-            @click="removeItem"
+            @click.stop="removeItem"
             class="text-[10px] bg-red-100 px-1 py-0.5 rounded"
           >✖</button>
         </template>
       </div>
     </div>
 
+    <!-- 内容 -->
     <transition name="fade">
       <div v-show="!item.folded" class="mt-0.5 overflow-visible">
         <slot name="body"></slot>
