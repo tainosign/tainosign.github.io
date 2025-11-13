@@ -1,29 +1,29 @@
 <!-- src/views/ShiftCreateView.vue -->
 <template>
-  <div class="p-2">
-    <div class="flex items-center justify-start mb-2">
-      <h2 class="text-lg font-bold">🗓 シフト作成</h2>
+  <div class="shift-create-page">
+    <!-- ヘッダー部分 -->
+    <div class="header-bar">
+      <h2 class="title">🗓 シフト作成</h2>
 
-      <!-- コンパクト操作ボタン群 -->
-      <div class="flex gap-2">
+      <div class="button-group">
         <button
           @click="toggleCreateMode"
           :disabled="isProcessing"
-          class="bg-gray-500 text-white text-sm px-2 py-1 rounded"
+          class="btn btn-gray"
           title="新規シフト作成"
         >
           ＋
         </button>
         <button
           @click="loadShifts"
-          class="bg-blue-500 text-white text-sm px-2 py-1 rounded"
+          class="btn btn-blue"
           title="読み込み"
         >
           🔄
         </button>
         <button
           @click="openSaveDialog"
-          class="bg-green-500 text-white text-sm px-2 py-1 rounded"
+          class="btn btn-green"
           title="保存"
         >
           💾
@@ -31,89 +31,74 @@
       </div>
     </div>
 
-    <!-- ✅ 新規作成モードのときだけ表示 -->
-    <div v-if="isCreating" class="border rounded p-2 mb-2 bg-gray-50">
-      <label class="font-semibold text-sm mb-1 block">📅 日付を選択（複数可）</label>
-      <div class="flex flex-wrap gap-1">
+    <!-- ✅ 新規作成モード -->
+    <div v-if="isCreating" class="create-panel">
+      <label class="label">📅 日付を選択（複数可）</label>
+      <div class="date-input-row">
         <input
           type="date"
           v-model="tempDate"
-          class="border rounded p-1 text-sm w-40"
+          class="date-input"
         />
-        <button
-          @click="addDate"
-          class="bg-gray-300 text-xs px-2 py-1 rounded"
-        >
-          ＋追加
-        </button>
+        <button @click="addDate" class="btn btn-light">＋追加</button>
       </div>
 
-      <!-- 選択済み日付一覧 -->
-      <div v-if="selectedDates.length" class="flex flex-wrap mt-2 gap-1 text-sm">
+      <div v-if="selectedDates.length" class="selected-dates">
         <span
           v-for="(d, index) in selectedDates"
           :key="index"
-          class="px-2 py-1 bg-blue-100 rounded cursor-pointer hover:bg-blue-200"
+          class="selected-date"
           @click="removeDate(index)"
         >
           {{ d }}
         </span>
       </div>
 
-      <div class="mt-3 text-right">
+      <div class="actions">
         <button
           @click="confirmCreate"
           :disabled="isProcessing"
-          class="bg-blue-600 text-white text-sm px-3 py-1 rounded"
+          class="btn btn-blue"
         >
           作成
         </button>
       </div>
     </div>
 
-    <!-- 📋 作成済み or 読み込み済みシフト -->
-    <div v-if="loadedShifts.length > 0">
-      <h3 class="font-semibold mb-1 text-sm text-gray-700">シフト一覧</h3>
-      <ScrollableRow>
-        <ShiftDate
+    <!-- 📋 シフト一覧 -->
+    <div v-if="loadedShifts.length > 0" class="shift-list-wrapper">
+      <div class="shift-wrapper">
+        <div
           v-for="shift in loadedShifts"
           :key="shift.id"
-          :shift="shift"
-        />
-      </ScrollableRow>
+          class="shift-container"
+        >
+          <ShiftDate :shift="shift" />
+        </div>
+      </div>
     </div>
 
     <!-- ❗ まだ何もないとき -->
-    <div v-else class="text-gray-500 text-sm mt-2">
+    <div v-else class="empty-message">
       まだシフトは作成または読み込まれていません。
     </div>
 
     <!-- 💾 保存モーダル -->
     <div
       v-if="showSaveDialog"
-      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50"
+      class="modal-backdrop"
     >
-      <div class="bg-white rounded-lg p-4 shadow-md w-80">
-        <h3 class="text-md font-bold mb-2">💾 シフトを保存</h3>
+      <div class="modal">
+        <h3 class="modal-title">💾 シフトを保存</h3>
         <input
           type="text"
           v-model="fileName"
           placeholder="保存ファイル名（例：festival-shift）"
-          class="border p-1 rounded w-full mb-3"
+          class="modal-input"
         />
-        <div class="flex justify-end gap-2">
-          <button
-            @click="showSaveDialog = false"
-            class="bg-gray-300 px-3 py-1 rounded"
-          >
-            キャンセル
-          </button>
-          <button
-            @click="saveShifts"
-            class="bg-green-500 text-white px-3 py-1 rounded"
-          >
-            保存
-          </button>
+        <div class="modal-actions">
+          <button @click="showSaveDialog = false" class="btn btn-light">キャンセル</button>
+          <button @click="saveShifts" class="btn btn-green">保存</button>
         </div>
       </div>
     </div>
@@ -124,26 +109,24 @@
 import { ref } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import ShiftDate from "@/components/shift/ShiftDate.vue";
-import ScrollableRow from "@/components/common/ScrollableRow.vue";
 import { toYMD_JST } from "@/composables/useJST";
 
 // ストア
 const store = useShiftStore();
 
-// 状態
+// 状態管理
 const selectedDates = ref([]);
 const tempDate = ref("");
 const loadedShifts = ref([]);
 const fileName = ref("");
 const showSaveDialog = ref(false);
-const isCreating = ref(false); // ✅ 追加：新規作成モード制御
-  const isProcessing = ref(false); // ボタン処理中フラグ（重複防止） 
+const isCreating = ref(false);
+const isProcessing = ref(false);
 
-// 🔄 新規作成モード切り替え
+// ✅ 新規作成モード切替
 const toggleCreateMode = () => {
   isCreating.value = !isCreating.value;
   if (isCreating.value) {
-    // モードON時は初期化
     selectedDates.value = [];
     tempDate.value = "";
   }
@@ -164,43 +147,33 @@ const removeDate = (index) => {
   selectedDates.value.splice(index, 1);
 };
 
-// ✅ 作成確定ボタン押下
-// ✅ 作成確定ボタン押下
-// ✅ 作成確定ボタン押下
+// ✅ 作成確定
 const confirmCreate = async () => {
   if (selectedDates.value.length === 0) {
     alert("📅 日付を1つ以上選択してください。");
     return;
   }
-
   if (isProcessing.value) return;
   isProcessing.value = true;
 
   try {
-    // ---- 重複作成防止 ----
     for (const d of selectedDates.value) {
-      const index = store.shifts.findIndex((s) => s.date === d);
-      if (index !== -1) store.shifts.splice(index, 1);
+      const idx = store.shifts.findIndex((s) => s.date === d);
+      if (idx !== -1) store.shifts.splice(idx, 1);
     }
 
-    // ---- 一括作成 ----
     await store.createNewShift(selectedDates.value);
-
-    // ---- 表示に反映 ----
     loadedShifts.value = [...store.shifts];
-    alert(`${selectedDates.value.length}日分のシフトを作成しました。`);
   } catch (err) {
-    console.error("作成中エラー:", err);
+    console.error(err);
     alert("作成に失敗しました。");
   } finally {
     isProcessing.value = false;
     isCreating.value = false;
-    selectedDates.value = [];
   }
 };
 
-
-// ✅ Firestoreから読み込み
+// ✅ Firestore読み込み
 const loadShifts = async () => {
   if (selectedDates.value.length === 0) {
     alert("📅 日付を選択してください。");
@@ -210,17 +183,15 @@ const loadShifts = async () => {
   try {
     const result = await store.getShiftsByDates(selectedDates.value);
     loadedShifts.value = result;
-    if (result.length === 0) alert("📂 Firestoreに該当するシフトはありません。");
-    else alert("✅ シフトを読み込みました。");
   } catch (e) {
-    console.error("❌ シフト読み込みエラー:", e);
+    console.error(e);
     alert("読み込みに失敗しました。");
   } finally {
     store.isLoading = false;
   }
 };
 
-// ✅ 保存モーダル開く
+// ✅ 保存
 const openSaveDialog = () => {
   if (loadedShifts.value.length === 0) {
     alert("⚠️ 保存するシフトがありません。");
@@ -229,7 +200,6 @@ const openSaveDialog = () => {
   showSaveDialog.value = true;
 };
 
-// ✅ Firestoreに保存
 const saveShifts = async () => {
   if (!fileName.value) {
     alert("⚠️ ファイル名を入力してください。");
@@ -240,7 +210,7 @@ const saveShifts = async () => {
     await store.saveShiftsByDates(loadedShifts.value, fileName.value);
     alert("✅ シフトを保存しました。");
   } catch (e) {
-    console.error("❌ シフト保存エラー:", e);
+    console.error(e);
     alert("保存に失敗しました。");
   } finally {
     store.isLoading = false;
@@ -250,47 +220,164 @@ const saveShifts = async () => {
 </script>
 
 <style scoped>
-button {
-  transition: all 0.2s;
+/* 全体レイアウト */
+.shift-create-page {
+  padding: 8px;
 }
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+/* ヘッダー */
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
 }
-  .shift-wrapper {
+
+.title {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 6px;
+}
+
+/* ボタン共通 */
+.btn {
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn:hover {
+  opacity: 0.8;
+}
+.btn-gray { background: #666; color: white; }
+.btn-blue { background: #007bff; color: white; }
+.btn-green { background: #28a745; color: white; }
+.btn-light { background: #e0e0e0; color: #333; }
+
+/* 新規作成パネル */
+.create-panel {
+  background: #f8f9fa;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.date-input-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.date-input {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px;
+  font-size: 0.85rem;
+}
+
+.selected-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.selected-date {
+  background: #cce5ff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.selected-date:hover {
+  background: #99ccff;
+}
+
+.actions {
+  text-align: right;
+  margin-top: 8px;
+}
+
+/* シフト表示エリア */
+.shift-list-wrapper {
+  overflow-x: auto;
+}
+
+.shift-wrapper {
   display: flex;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  width: 100%;
-  padding: 8px;
   gap: 12px;
+  padding: 6px;
+  overflow-x: auto;
   scroll-behavior: smooth;
 }
 
 .shift-container {
-  flex: 0 0 320px; /* 固定幅（必要に応じて調整） */
-  min-width: 300px;
-  background: #fff;
+  flex: 0 0 320px;
+  background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 8px;
-  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
 }
 
-.shift-container.expanded {
-  flex-basis: 400px; /* +ボタン押下時に少し広がる */
-}
-
-.shift-header {
+/* モーダル */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: center;
+  z-index: 50;
 }
 
-.shift-scroll {
+.modal {
+  background: white;
+  padding: 16px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 360px;
+}
+
+.modal-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.modal-input {
   width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.empty-message {
+  color: #666;
+  font-size: 0.85rem;
+  margin-top: 8px;
 }
 </style>
