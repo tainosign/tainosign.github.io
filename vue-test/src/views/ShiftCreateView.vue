@@ -257,4 +257,40 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+  .shift-wrapper {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  padding: 8px;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.shift-container {
+  flex: 0 0 320px; /* 固定幅（必要に応じて調整） */
+  min-width: 300px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  transition: all 0.2s ease;
+}
+
+.shift-container.expanded {
+  flex-basis: 400px; /* +ボタン押下時に少し広がる */
+}
+
+.shift-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shift-scroll {
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
 </style>
