@@ -8,6 +8,7 @@
       <div class="flex gap-2">
         <button
           @click="toggleCreateMode"
+          :disabled="isProcessing"
           class="bg-gray-500 text-white text-sm px-2 py-1 rounded"
           title="新規シフト作成"
         >
@@ -62,6 +63,7 @@
       <div class="mt-3 text-right">
         <button
           @click="confirmCreate"
+          :disabled="isProcessing"
           class="bg-blue-600 text-white text-sm px-3 py-1 rounded"
         >
           作成
