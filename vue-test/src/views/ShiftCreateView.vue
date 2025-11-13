@@ -165,37 +165,41 @@ const removeDate = (index) => {
 };
 
 // ✅ 作成確定ボタン押下
+// ✅ 作成確定ボタン押下
 const confirmCreate = async () => {
   if (selectedDates.value.length === 0) {
     alert("📅 日付を1つ以上選択してください。");
     return;
   }
 
-  // 二重クリック防止
   if (isProcessing.value) return;
   isProcessing.value = true;
 
   try {
-    // ---- 重複作成防止のため、明示的に既存削除→再生成 ----
+    // ---- 既存の同日シフトを削除（重複防止） ----
     for (const d of selectedDates.value) {
       const index = store.shifts.findIndex((s) => s.date === d);
       if (index !== -1) store.shifts.splice(index, 1);
     }
 
-    // ---- 新規作成：日付ごとに1つだけ ----
+    // ---- 新規作成：選択日ごとに1つずつ ----
     for (const d of selectedDates.value) {
-      store.createNewShift([d]);
+      await store.createNewShift(d); // ← 配列ではなく文字列
     }
 
+    // ---- 表示に反映 ----
+    loadedShifts.value = [...store.shifts];
     alert(`${selectedDates.value.length}日分のシフトを作成しました。`);
   } catch (err) {
     console.error("作成中エラー:", err);
+    alert("作成に失敗しました。");
   } finally {
     isProcessing.value = false;
     isCreating.value = false;
     selectedDates.value = [];
   }
 };
+
 
 // ✅ Firestoreから読み込み
 const loadShifts = async () => {
