@@ -153,24 +153,9 @@ const confirmCreate = async () => {
     alert("📅 日付を1つ以上選択してください。");
     return;
   }
-  if (isProcessing.value) return;
-  isProcessing.value = true;
-
-  try {
-    for (const d of selectedDates.value) {
-      const idx = store.shifts.findIndex((s) => s.date === d);
-      if (idx !== -1) store.shifts.splice(idx, 1);
-    }
-
-    await store.createNewShift(selectedDates.value);
-    loadedShifts.value = [...store.shifts];
-  } catch (err) {
-    console.error(err);
-    alert("作成に失敗しました。");
-  } finally {
-    isProcessing.value = false;
-    isCreating.value = false;
-  }
+  store.createNewShift(selectedDates.value);
+  loadedShifts.value = [...store.shifts];
+  isCreating.value = false;
 };
 
 // ✅ Firestore読み込み
