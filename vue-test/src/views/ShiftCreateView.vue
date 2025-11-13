@@ -166,6 +166,7 @@ const removeDate = (index) => {
 
 // ✅ 作成確定ボタン押下
 // ✅ 作成確定ボタン押下
+// ✅ 作成確定ボタン押下
 const confirmCreate = async () => {
   if (selectedDates.value.length === 0) {
     alert("📅 日付を1つ以上選択してください。");
@@ -176,16 +177,14 @@ const confirmCreate = async () => {
   isProcessing.value = true;
 
   try {
-    // ---- 既存の同日シフトを削除（重複防止） ----
+    // ---- 重複作成防止 ----
     for (const d of selectedDates.value) {
       const index = store.shifts.findIndex((s) => s.date === d);
       if (index !== -1) store.shifts.splice(index, 1);
     }
 
-    // ---- 新規作成：選択日ごとに1つずつ ----
-    for (const d of selectedDates.value) {
-      await store.createNewShift(d); // ← 配列ではなく文字列
-    }
+    // ---- 一括作成 ----
+    await store.createNewShift(selectedDates.value);
 
     // ---- 表示に反映 ----
     loadedShifts.value = [...store.shifts];
