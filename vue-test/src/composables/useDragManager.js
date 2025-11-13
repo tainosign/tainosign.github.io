@@ -2,6 +2,7 @@
 import { ref } from "vue";
 
 const dropHandlers = ref({});
+const draggingMember = ref(null);
 
 export function useDragManager() {
   // Drag開始
@@ -36,9 +37,28 @@ export function useDragManager() {
     dropHandlers.value[dragType] = fn;
   }
 
+
+
+
+
+
+  const startDragMember = (member) => {
+    draggingMember.value = member;
+  };
+
+  const getDraggingMember = () => draggingMember.value;
+
+  const clearDrag = () => {
+    draggingMember.value = null;
+  };
+
+
   return {
     startDrag,
     parseDrop,
     registerHandler,
+    startDragMember,
+    getDraggingMember,
+    clearDrag,
   };
 }
