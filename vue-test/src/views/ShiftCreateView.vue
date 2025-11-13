@@ -320,21 +320,20 @@ const saveShifts = async () => {
 
 .shift-wrapper {
   display: flex;
-  flex-wrap: nowrap;
+  flex-direction: row; /* 横並び */
+  flex-wrap: nowrap;   /* 横スクロール */
   gap: 12px;
-  padding: 6px;
   overflow-x: auto;
-  scroll-behavior: smooth;
+  padding: 6px;
 }
 
 .shift-container {
-  flex: 0 0 320px;
+  flex: 0 0 320px;      /* 固定幅 */
+  min-width: 300px;
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
 }
 
 /* モーダル */
