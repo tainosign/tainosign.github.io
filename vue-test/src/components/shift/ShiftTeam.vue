@@ -2,8 +2,10 @@
   <ShiftContainer :item="team" :list="[team]" type="team">
     <template #header>
       <div class="flex justify-between items-center mb-1">
+        <!-- 入力欄がドラッグを邪魔しないよう stop を付与 -->
         <input
           v-model="team.name"
+          @dragstart.stop
           placeholder="チーム名"
           class="border rounded px-2 py-1 text-sm w-32"
         />
