@@ -1,3 +1,4 @@
+// src/stores/shiftStore.js
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useFirestoreShifts } from "@/composables/useFirestoreShifts";
@@ -26,18 +27,17 @@ export const useShiftStore = defineStore("shiftStore", () => {
     activeDay.value = date;
   };
 
-const createNewShift = (dates) => {
-  for (const date of dates) {
-    // 既に同じ日付が存在するかチェック
-    if (!shifts.value.some(s => s.date === date)) {
-      shifts.value.push({
-        id: `${date}-${Date.now()}`,
-        date,
-        teams: [],
-      });
+  const createNewShift = (dates) => {
+    for (const date of dates) {
+      if (!shifts.value.some((s) => s.date === date)) {
+        shifts.value.push({
+          id: `${date}-${Date.now()}`,
+          date,
+          teams: [],
+        });
+      }
     }
-  }
-};
+  };
 
   const getShiftsByDates = async (dates) => {
     const { getShiftByDate } = await useFirestoreShifts();
@@ -60,9 +60,8 @@ const createNewShift = (dates) => {
   };
 
   // -------------------
-  // 🔹 チーム・ポジション・スロット操作
+  // チーム / ポジション / スロット 操作
   // -------------------
-
   const addTeam = (date) => {
     const shift = shifts.value.find((s) => s.date === date);
     if (!shift) return;
@@ -149,6 +148,39 @@ const createNewShift = (dates) => {
     pos.slots = pos.slots.filter((s) => s.slotId !== slotId);
   };
 
+  // -------------------
+  // assignMemberToSlot: ドラッグで配置したメンバーをストアに反映する
+  // blockData: { id, memberId, memberName, start_min, duration_min }
+  // -------------------
+  const assignMemberToSlot = (date, teamId, positionId, blockData) => {
+    const shift = shifts.value.find((s) => s.date === date);
+    if (!shift) {
+      console.warn("assignMemberToSlot: shift not found", date);
+      return;
+    }
+    const team = shift.teams.find((t) => t.id === teamId);
+    if (!team) {
+      console.warn("assignMemberToSlot: team not found", teamId);
+      return;
+    }
+    const pos = team.positions.find((p) => p.positionId === positionId);
+    if (!pos) {
+      console.warn("assignMemberToSlot: position not found", positionId);
+      return;
+    }
+
+    // pos.members? pos.slots? 既存データ形に合わせる
+    // ここでは pos.slots の中に block を追加する（簡易実装）
+    if (!Array.isArray(pos.slots)) pos.slots = [];
+    pos.slots.push({
+      slotId: blockData.id || `slot_${Date.now()}`,
+      memberId: blockData.memberId,
+      memberName: blockData.memberName,
+      start_min: blockData.start_min,
+      duration_min: blockData.duration_min,
+    });
+  };
+
   return {
     shifts,
     festivalDays,
@@ -170,5 +202,8 @@ const createNewShift = (dates) => {
     duplicatePosition,
     addSlot,
     removeSlot,
+
+    // 新規 API
+    assignMemberToSlot,
   };
 });
