@@ -1,62 +1,73 @@
-// useDragManager.js
+// src/composables/useDragManager.js
 import { ref } from "vue";
 
 const dropHandlers = ref({});
 const draggingMember = ref(null);
 
 export function useDragManager() {
-  // Drag開始
+  // 汎用 startDrag: 呼び出し側は e を渡すこと
   function startDrag(dragType, payload, e) {
-    e.dataTransfer.effectAllowed = "copyMove";
-    e.dataTransfer.setData(
-      "application/json",
-      JSON.stringify({
-        dragType,
-        payload,
-      })
-    );
-  }
-
-  // Drop解析＆呼び出し
-  function parseDrop(e, extraContext = null) {
-    const raw = e.dataTransfer.getData("application/json");
-    if (!raw) return;
-
-    const { dragType, payload } = JSON.parse(raw);
-
-    const handler = dropHandlers.value[dragType];
-    if (handler) {
-      handler(payload, e, extraContext);
-    } else {
-      console.warn("Handler not found for dragType:", dragType);
+    if (e && e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "copyMove";
+      e.dataTransfer.setData(
+        "application/json",
+        JSON.stringify({
+          dragType,
+          payload,
+        })
+      );
+    }
+    // 特殊保持（必要なら）
+    if (dragType === "member") {
+      draggingMember.value = payload;
     }
   }
 
-  // handler登録
+  // Drop のときに呼ぶ（ShiftSlot などが呼ぶ）
+  // extraContext は任意でドロップ先情報などを渡せる
+  function parseDrop(e, extraContext = null) {
+    try {
+      const raw = e.dataTransfer.getData("application/json");
+      if (!raw) return;
+      const { dragType, payload } = JSON.parse(raw);
+      const handler = dropHandlers.value[dragType];
+      if (handler) {
+        handler(payload, e, extraContext);
+      } else {
+        console.warn("useDragManager: handler not found for dragType:", dragType);
+      }
+    } catch (err) {
+      console.error("useDragManager.parseDrop error:", err);
+    } finally {
+      // clear ephemeral draggingMember
+      draggingMember.value = null;
+    }
+  }
+
+  // handler 登録
   function registerHandler(dragType, fn) {
     dropHandlers.value[dragType] = fn;
   }
 
+  function unregisterHandler(dragType) {
+    delete dropHandlers.value[dragType];
+  }
 
-
-
-
-
-  const startDragMember = (member) => {
-    draggingMember.value = member;
+  // member 用の簡易 API（任意）
+  const startDragMember = (member, e) => {
+    startDrag("member", member, e);
   };
 
   const getDraggingMember = () => draggingMember.value;
-
   const clearDrag = () => {
     draggingMember.value = null;
   };
-
 
   return {
     startDrag,
     parseDrop,
     registerHandler,
+    unregisterHandler,
     startDragMember,
     getDraggingMember,
     clearDrag,
