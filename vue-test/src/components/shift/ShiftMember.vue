@@ -1,6 +1,7 @@
+<!-- src/components/shift/ShiftMember.vue -->
 <template>
   <div
-    class="absolute left-0 bg-green-200 rounded p-1 text-xs cursor-grab active:cursor-grabbing shadow"
+    class="bg-yellow-100 rounded px-2 py-1 text-sm cursor-grab active:cursor-grabbing"
     draggable="true"
     @dragstart="handleDragStart"
   >
@@ -9,18 +10,22 @@
 </template>
 
 <script setup>
-import { useDragManager } from "@/stores/dragManager";
+import { useDragManager } from "@/composables/useDragManager";
 
 const props = defineProps({
-  member: { type: Object, required: true }
+  member: { type: Object, required: true },
 });
 
 const dragManager = useDragManager();
 
-const handleDragStart = () => {
-  dragManager.startDrag({
-    type: "member",
-    data: props.member,
-  });
+const handleDragStart = (e) => {
+  // member を dragManager 経由で配布
+  dragManager.startDrag("member", props.member, e);
+  // 簡易保持
+  dragManager.startDragMember(props.member, e);
 };
 </script>
+
+<style scoped>
+/* 必要なら追加スタイル */
+</style>
