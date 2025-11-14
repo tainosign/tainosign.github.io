@@ -2,8 +2,10 @@
   <ShiftContainer :item="position" :list="[position]" type="position">
     <template #header>
       <div class="flex justify-between items-center mb-1">
+        <!-- drag を阻害しないため stop を付与 -->
         <input
           v-model="positionName"
+          @dragstart.stop
           class="border rounded px-2 py-1 text-sm w-40"
           placeholder="ポジション名"
         />
@@ -29,7 +31,7 @@
           </div>
         </div>
 
-        <!-- スロット（横方向追加） -->
+        <!-- スロット（横方向追加 / ドロップ受け側） -->
         <div class="flex flex-row gap-2 flex-nowrap">
           <ShiftSlot
             v-for="slot in position.slots"
@@ -58,8 +60,8 @@ const props = defineProps({
 });
 
 const store = useShiftStore();
-const positionName = ref(props.position.name || "");
 
+const positionName = ref(props.position.name || "");
 watch(positionName, (v) => {
   props.position.name = v;
 });
@@ -74,9 +76,7 @@ const timeMarks = computed(() => {
   for (let h = 7; h <= 19; h++) {
     for (let m = 0; m < 60; m += 10) {
       if (h === 19 && m > 0) break;
-      const hh = h.toString().padStart(2, "0");
-      const mm = m.toString().padStart(2, "0");
-      times.push(`${hh}:${mm}`);
+      times.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
   }
   return times;
