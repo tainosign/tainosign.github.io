@@ -1,3 +1,4 @@
+<!-- src/components/shift/MemberPanelToggle.vue -->
 <template>
   <!-- シフト日選択 -->
   <div class="fixed top-4 right-4 bg-white shadow rounded p-2 z-50 flex gap-2">
@@ -47,7 +48,7 @@
         :key="m.id"
         class="border rounded p-2 mb-2 shadow-sm bg-white cursor-move hover:bg-blue-50 transition"
         draggable="true"
-        @dragstart="onDragStart(m)"
+        @dragstart="onDragStart(m, $event)"
       >
         <div class="font-semibold">{{ m.name_kanji || m.name }}</div>
       </div>
@@ -59,6 +60,9 @@
 import { ref, computed, onMounted } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import { useMemberStore } from "@/stores/memberStore";
+import { useDragManager } from "@/composables/useDragManager";
+
+const dragManager = useDragManager();
 
 const showPanel = ref(false);
 const panelWidth = 400;
@@ -68,16 +72,16 @@ const shiftStore = useShiftStore();
 const memberStore = useMemberStore();
 
 onMounted(async () => {
-  await memberStore.loadMembers();
-  await shiftStore.loadFestivalShifts();
+  await memberStore.loadMembers?.();
+  await shiftStore.loadFestivalShifts?.();
 });
 
 const filteredMembers = computed(() => {
-  const activeShift = shiftStore.getShiftForActiveDay();
+  const activeShift = shiftStore.getShiftForActiveDay?.();
   const assignedIds =
-    activeShift?.slots.flatMap((slot) => slot.members.map((m) => m.id)) || [];
+    activeShift?.slots?.flatMap((slot) => slot.members?.map((m) => m.id) || []) || [];
 
-  return memberStore.members.filter((m) => {
+  return (memberStore.members || []).filter((m) => {
     const assigned = assignedIds.includes(m.id);
     if (filterStatus.value === "unassigned") return !assigned;
     if (filterStatus.value === "assigned") return assigned;
@@ -87,10 +91,12 @@ const filteredMembers = computed(() => {
 
 const togglePanel = () => (showPanel.value = !showPanel.value);
 
-const onDragStart = (member) => (e) => {
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("application/json", JSON.stringify(member));
-  console.log(`ドラッグ開始: ${member.name_kanji || member.name}`);
+const onDragStart = (member, e) => {
+  // dragManager 経由で統一的に開始
+  dragManager.startDrag("member", member, e);
+  // 互換のために保持も
+  dragManager.startDragMember(member, e);
+  console.log("MemberPanelToggle: start drag", member);
 };
 
 const autoAssign = () => {
