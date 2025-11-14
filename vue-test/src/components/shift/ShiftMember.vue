@@ -1,9 +1,26 @@
 <template>
-  <div class="bg-yellow-100 rounded px-2 py-1 text-sm">{{ member.name }}</div>
+  <div
+    class="absolute left-0 bg-green-200 rounded p-1 text-xs cursor-grab active:cursor-grabbing shadow"
+    draggable="true"
+    @dragstart="handleDragStart"
+  >
+    {{ member.name }}
+  </div>
 </template>
 
 <script setup>
+import { useDragManager } from "@/stores/dragManager";
+
 const props = defineProps({
-  member: Object,
+  member: { type: Object, required: true }
 });
+
+const dragManager = useDragManager();
+
+const handleDragStart = () => {
+  dragManager.startDrag({
+    type: "member",
+    data: props.member,
+  });
+};
 </script>
