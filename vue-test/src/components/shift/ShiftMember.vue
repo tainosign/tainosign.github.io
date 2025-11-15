@@ -19,13 +19,10 @@ const props = defineProps({
 const dragManager = useDragManager();
 
 const handleDragStart = (e) => {
-  // member を dragManager 経由で配布
   dragManager.startDrag("member", props.member, e);
-  // 簡易保持
   dragManager.startDragMember(props.member, e);
 };
 </script>
 
 <style scoped>
-/* 必要なら追加スタイル */
 </style>
