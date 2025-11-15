@@ -4,20 +4,18 @@
     :class="{ 'opacity-70 bg-gray-100': item.locked }"
     :style="containerStyle"
   >
-    <!-- ドラッグハンドル部分（コンテナ移動用） -->
-    <div
-      class="flex justify-between items-center mb-0.5 cursor-move select-none"
-      draggable="true"
-      @dragstart="handleDragStart"
-      @dragend="handleDragEnd"
-    >
-      <template v-if="!item.folded">
-        <slot name="header">
-          <span class="font-bold text-xs">{{ item.name }}</span>
-        </slot>
-      </template>
+    <!-- ヘッダー：ドラッグハンドルは右端のハンドルで取る -->
+    <div class="flex justify-between items-center mb-0.5">
+      <div class="flex items-center gap-2">
+        <template v-if="!item.folded">
+          <slot name="header">
+            <span class="font-bold text-xs">{{ item.name }}</span>
+          </slot>
+        </template>
+      </div>
 
-      <div class="flex gap-0.5 items-center cursor-default">
+      <div class="flex gap-0.5 items-center">
+        <!-- 折りたたみなどはここで処理（ローカル操作） -->
         <button @click.stop="toggleFold" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">
           {{ item.folded ? "＋" : "－" }}
         </button>
@@ -31,18 +29,27 @@
             {{ item.locked ? '🔒' : '🔓' }}
           </button>
 
-          <button @click.stop="duplicateItem" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
+          <!-- 複製／削除は emit して親が決定的処理を行う -->
+          <button @click.stop="emitDuplicate" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
 
           <button
             v-if="!item.locked"
-            @click.stop="removeItem"
+            @click.stop="emitRemove"
             class="text-[10px] bg-red-100 px-1 py-0.5 rounded"
           >✖</button>
         </template>
+
+        <!-- ドラッグ用ハンドル（見た目は小さなハンドル） -->
+        <div
+          class="drag-handle ml-1 px-1 py-0.5 rounded bg-gray-200 text-[11px] cursor-move select-none"
+          draggable="true"
+          @dragstart="onDragStart"
+          @dragend="onDragEnd"
+          title="ドラッグ移動"
+        >☰</div>
       </div>
     </div>
 
-    <!-- 内容 -->
     <transition name="fade">
       <div v-show="!item.folded" class="mt-0.5 overflow-visible">
         <slot name="body"></slot>
@@ -55,63 +62,49 @@
 import { computed } from "vue";
 import { useShiftItem } from "@/composables/useShiftItem";
 import { useShiftStore } from "@/stores/shiftStore";
-import { useDragManager } from "@/composables/useDragManager";
 
 const props = defineProps({
   item: Object,
-  list: Array,
+  // optional: containerWidth allows parent to specify width (px or %)
+  containerWidth: { type: [String, Number], default: null },
   type: { type: String, default: "generic" },
+  context: { type: Object, default: () => ({}) }, // optional context (date/teamId/positionId)
 });
+const emits = defineEmits(["duplicate", "remove", "dragstart", "dragend"]);
 
 const store = useShiftStore();
-const dragManager = useDragManager();
-
 const { toggleLock, toggleFold } = useShiftItem(props.item);
 
-const containerStyle = computed(() => ({
-  width: props.item.folded ? "70px" : "100%",
-  transition: "width 0.2s ease",
-  overflowY: "visible",
-}));
+const containerStyle = computed(() => {
+  const base = {
+    width: props.item.folded ? "70px" : "100%",
+    transition: "width 0.2s ease",
+    overflowY: "visible",
+  };
+  if (props.containerWidth !== null) {
+    base.width = typeof props.containerWidth === "number" ? `${props.containerWidth}px` : props.containerWidth;
+  }
+  return base;
+});
 
-/* -------------------------
-  複製 & 削除
-------------------------- */
-const duplicateItem = () => {
-  if (props.type === "team") {
-    store.duplicateTeam(props.list[0]?.date, props.item.id);
-  }
-  if (props.type === "position") {
-    store.duplicatePosition(props.list[0]?.teamId, props.item.positionId);
-  }
+const emitDuplicate = () => {
+  emits("duplicate", { item: props.item, type: props.type, context: props.context });
+};
+const emitRemove = () => {
+  emits("remove", { item: props.item, type: props.type, context: props.context });
 };
 
-const removeItem = () => {
-  if (props.type === "team") {
-    store.removeTeam(props.list[0]?.date, props.item.id);
+const onDragStart = (e) => {
+  // Drag payload: include type and identifying context so drop handlers can act
+  const payload = { type: props.type, item: props.item, context: props.context };
+  if (e && e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "container", payload }));
   }
-  if (props.type === "position") {
-    store.removePosition(props.list[0]?.teamId, props.item.positionId);
-  }
+  emits("dragstart", payload);
 };
-
-/* -------------------------
-  ドラッグ（移動用） dragManager に統一
-------------------------- */
-const handleDragStart = (e) => {
-  dragManager.startDrag(
-    "container",
-    {
-      type: props.type,
-      item: props.item,
-      list: props.list,
-    },
-    e
-  );
-};
-
-const handleDragEnd = () => {
-  // 特に後処理無し
+const onDragEnd = () => {
+  emits("dragend");
 };
 </script>
 
@@ -123,5 +116,8 @@ const handleDragEnd = () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+.drag-handle {
+  user-select: none;
 }
 </style>
