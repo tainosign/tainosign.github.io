@@ -149,8 +149,7 @@ export const useShiftStore = defineStore("shiftStore", () => {
   };
 
   // -------------------
-  // assignMemberToSlot: ドラッグで配置したメンバーをストアに反映する
-  // blockData: { id, memberId, memberName, start_min, duration_min }
+  // assignMemberToSlot（ドラッグで配置されたメンバーを保存）
   // -------------------
   const assignMemberToSlot = (date, teamId, positionId, blockData) => {
     const shift = shifts.value.find((s) => s.date === date);
@@ -158,20 +157,21 @@ export const useShiftStore = defineStore("shiftStore", () => {
       console.warn("assignMemberToSlot: shift not found", date);
       return;
     }
+
     const team = shift.teams.find((t) => t.id === teamId);
     if (!team) {
       console.warn("assignMemberToSlot: team not found", teamId);
       return;
     }
+
     const pos = team.positions.find((p) => p.positionId === positionId);
     if (!pos) {
       console.warn("assignMemberToSlot: position not found", positionId);
       return;
     }
 
-    // pos.members? pos.slots? 既存データ形に合わせる
-    // ここでは pos.slots の中に block を追加する（簡易実装）
     if (!Array.isArray(pos.slots)) pos.slots = [];
+
     pos.slots.push({
       slotId: blockData.id || `slot_${Date.now()}`,
       memberId: blockData.memberId,
@@ -203,7 +203,6 @@ export const useShiftStore = defineStore("shiftStore", () => {
     addSlot,
     removeSlot,
 
-    // 新規 API
     assignMemberToSlot,
   };
 });
