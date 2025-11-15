@@ -1,4 +1,3 @@
-<!-- src/components/shift/ShiftMember.vue -->
 <template>
   <div
     class="bg-yellow-100 rounded px-2 py-1 text-sm cursor-grab active:cursor-grabbing"
@@ -24,5 +23,4 @@ const handleDragStart = (e) => {
 };
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>
