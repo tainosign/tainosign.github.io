@@ -69,11 +69,9 @@ import { useDragManager } from "@/composables/useDragManager";
 import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
-  // 余地があるなら shiftDate/teamId/positionId を渡す（将来的に使う）
   shiftDate: { type: String, required: false },
   teamId: { type: String, required: false },
   positionId: { type: String, required: false },
-
   position: Object,
   slots: { type: Array, default: () => [] },
 });
@@ -88,9 +86,11 @@ const startHour = 7;
 const endHour = 19;
 const totalMinutes = (endHour - startHour) * 60;
 const gridUnit = 10;
+
+// local copy
 const localSlots = ref((props.slots || []).map((s) => ({ ...s })));
 
-// 時刻ラベル
+// 時刻ラベル生成
 const timeLabels = computed(() => {
   const arr = [];
   for (let h = startHour; h <= endHour; h++) {
@@ -102,28 +102,30 @@ const timeLabels = computed(() => {
   return arr;
 });
 
-// Drag Over
+/* ------------------------------
+   Drag Over
+------------------------------ */
 function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
-// Drop: ここでは dragManager.parseDrop を直接呼ばず、
-// このコンポーネント自身が 'member' ハンドラを登録して受ける方針にする
+/* ------------------------------
+   Drop 処理
+------------------------------ */
 function onDrop(e) {
-  // パースして処理（startDrag が JSON をセットしている前提）
   try {
     const raw = e.dataTransfer.getData("application/json");
     if (!raw) return;
+
     const { dragType, payload } = JSON.parse(raw);
 
+    // ① メンバーのドロップ
     if (dragType === "member") {
-      // クリックした位置から開始時刻を決める
       const rect = timelineRef.value.getBoundingClientRect();
       const y = e.clientY - rect.top;
       const minutesFromTop = Math.round((y / rect.height) * totalMinutes / gridUnit) * gridUnit;
       const start_min = startHour * 60 + minutesFromTop;
 
-      // 新しい block を作る
       const block = {
         id: `blk_${Date.now()}`,
         memberId: payload.id || payload.uid || null,
@@ -132,32 +134,28 @@ function onDrop(e) {
         duration_min: 60,
       };
 
-      // ローカルに追加して emit
       localSlots.value.push(block);
       emit("update-slots", localSlots.value);
 
-      // store にも反映（存在すれば）
       if (props.shiftDate && props.teamId && props.positionId) {
         store.assignMemberToSlot?.(
           props.shiftDate,
           props.teamId,
           props.positionId,
-          {
-            id: block.id,
-            memberId: block.memberId,
-            memberName: block.memberName,
-            start_min: block.start_min,
-            duration_min: block.duration_min,
-          }
+          block
         );
       }
     }
+
+    // ② 既存ブロック(slotBlock) のドラッグ移動は今後必要なら追加可能
   } catch (err) {
     console.error("ShiftSlot.onDrop parse error:", err);
   }
 }
 
-// ブロック描画用スタイル
+/* ------------------------------
+   block のスタイル
+------------------------------ */
 function blockStyle(block) {
   const topRatio = (block.start_min - startHour * 60) / totalMinutes;
   const heightRatio = block.duration_min / totalMinutes;
@@ -167,39 +165,50 @@ function blockStyle(block) {
   };
 }
 
+/* ------------------------------
+   時刻表示
+------------------------------ */
 function minutesToHHMM(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
-
 function formatBlockTime(block) {
   const start = minutesToHHMM(block.start_min);
   const end = minutesToHHMM(block.start_min + block.duration_min);
   return `${start}〜${end}`;
 }
 
+/* ------------------------------
+   block 操作
+------------------------------ */
 function changeDuration(block, delta) {
-  block.duration_min = Math.max(gridUnit, Math.round((block.duration_min + delta) / gridUnit) * gridUnit);
+  block.duration_min = Math.max(
+    gridUnit,
+    Math.round((block.duration_min + delta) / gridUnit) * gridUnit
+  );
   emit("update-slots", localSlots.value);
 }
-
 function removeBlock(id) {
   localSlots.value = localSlots.value.filter((b) => b.id !== id);
   emit("update-slots", localSlots.value);
 }
 
 const selectedBlock = ref(null);
-function selectBlock(block, ev) {
+function selectBlock(block, e) {
   selectedBlock.value = block;
 }
 
-// ドラッグ開始（既存ブロックを移動したい場合など）
+/* ------------------------------
+   block のドラッグ開始
+------------------------------ */
 function onBlockDragStart(block, e) {
-  // 現在は簡易的に block の情報を渡す
   dragManager.startDrag("slotBlock", block, e);
 }
 
+/* ------------------------------
+   props.slots の変更監視
+------------------------------ */
 watch(
   () => props.slots,
   (v) => {
@@ -208,15 +217,10 @@ watch(
   { deep: true }
 );
 
-// --- 登録/解除（将来的に registerHandler を使う場合） ---
-onMounted(() => {
-  // ここでは registerHandler を使わず、onDrop で直接処理している。
-});
-onBeforeUnmount(() => {
-  // nothing now
-});
+onMounted(() => {});
+onBeforeUnmount(() => {});
 </script>
 
 <style scoped>
-/* 必要なら微調整 */
+/* 必要なら調整 */
 </style>
