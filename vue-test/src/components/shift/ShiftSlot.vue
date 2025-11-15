@@ -1,6 +1,13 @@
 <!-- src/components/shift/ShiftSlot.vue -->
 <template>
   <div class="border rounded p-1 bg-white relative">
+    <!-- 小さなツールバー -->
+    <div class="flex justify-end gap-1 mb-1">
+      <button class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">…</button>
+      <button class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
+      <button class="text-[10px] bg-red-100 px-1 py-0.5 rounded">✖</button>
+    </div>
+
     <div class="text-[10px] text-gray-600 font-semibold mb-0.5 text-center">
       タイムライン（7:00〜19:00）
     </div>
@@ -41,10 +48,16 @@
         @dragstart="onBlockDragStart(block, $event)"
         @mousedown.prevent="selectBlock(block, $event)"
       >
-        <div class="flex justify-between items-center">
+        <!-- 左端時間バッジ -->
+        <div class="absolute -left-10 top-0 text-[9px] text-gray-600 px-0.5" :style="{ transform: 'translateY(4px)' }">
+          {{ minutesToHHMM(block.start_min) }}
+        </div>
+
+        <div class="flex justify-between items-center pl-1">
           <div class="truncate">{{ block.memberName || '未割当' }}</div>
           <div class="text-[9px] text-gray-500">{{ formatBlockTime(block) }}</div>
         </div>
+
         <div class="flex justify-between mt-0.5">
           <button class="text-[9px] px-1 border rounded" @click.stop="changeDuration(block, -10)">-</button>
           <button class="text-[9px] px-1 border rounded" @click.stop="changeDuration(block, 10)">+</button>
@@ -73,9 +86,8 @@ const props = defineProps({
   teamId: { type: String, required: false },
   positionId: { type: String, required: false },
   position: Object,
-  slots: { type: Array, default: () => [] },
+  slots: { type: Array, default: () => [] }, // expected to be array of block objects
 });
-
 const emit = defineEmits(["update-slots"]);
 
 const dragManager = useDragManager();
@@ -86,11 +98,9 @@ const startHour = 7;
 const endHour = 19;
 const totalMinutes = (endHour - startHour) * 60;
 const gridUnit = 10;
-
-// local copy
 const localSlots = ref((props.slots || []).map((s) => ({ ...s })));
 
-// 時刻ラベル生成
+// 時刻ラベル
 const timeLabels = computed(() => {
   const arr = [];
   for (let h = startHour; h <= endHour; h++) {
@@ -102,24 +112,16 @@ const timeLabels = computed(() => {
   return arr;
 });
 
-/* ------------------------------
-   Drag Over
------------------------------- */
 function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
-/* ------------------------------
-   Drop 処理
------------------------------- */
 function onDrop(e) {
   try {
     const raw = e.dataTransfer.getData("application/json");
     if (!raw) return;
-
     const { dragType, payload } = JSON.parse(raw);
 
-    // ① メンバーのドロップ
     if (dragType === "member") {
       const rect = timelineRef.value.getBoundingClientRect();
       const y = e.clientY - rect.top;
@@ -142,20 +144,23 @@ function onDrop(e) {
           props.shiftDate,
           props.teamId,
           props.positionId,
-          block
+          {
+            id: block.id,
+            memberId: block.memberId,
+            memberName: block.memberName,
+            start_min: block.start_min,
+            duration_min: block.duration_min,
+          }
         );
       }
     }
 
-    // ② 既存ブロック(slotBlock) のドラッグ移動は今後必要なら追加可能
+    // slotBlock（既にあるブロックの移動）等の処理も later
   } catch (err) {
     console.error("ShiftSlot.onDrop parse error:", err);
   }
 }
 
-/* ------------------------------
-   block のスタイル
------------------------------- */
 function blockStyle(block) {
   const topRatio = (block.start_min - startHour * 60) / totalMinutes;
   const heightRatio = block.duration_min / totalMinutes;
@@ -165,50 +170,37 @@ function blockStyle(block) {
   };
 }
 
-/* ------------------------------
-   時刻表示
------------------------------- */
 function minutesToHHMM(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
 function formatBlockTime(block) {
   const start = minutesToHHMM(block.start_min);
   const end = minutesToHHMM(block.start_min + block.duration_min);
   return `${start}〜${end}`;
 }
 
-/* ------------------------------
-   block 操作
------------------------------- */
 function changeDuration(block, delta) {
-  block.duration_min = Math.max(
-    gridUnit,
-    Math.round((block.duration_min + delta) / gridUnit) * gridUnit
-  );
+  block.duration_min = Math.max(gridUnit, Math.round((block.duration_min + delta) / gridUnit) * gridUnit);
   emit("update-slots", localSlots.value);
 }
+
 function removeBlock(id) {
   localSlots.value = localSlots.value.filter((b) => b.id !== id);
   emit("update-slots", localSlots.value);
 }
 
 const selectedBlock = ref(null);
-function selectBlock(block, e) {
+function selectBlock(block, ev) {
   selectedBlock.value = block;
 }
 
-/* ------------------------------
-   block のドラッグ開始
------------------------------- */
 function onBlockDragStart(block, e) {
-  dragManager.startDrag("slotBlock", block, e);
+  dragManager.startDrag("slotBlock", { block, from: { shiftDate: props.shiftDate, teamId: props.teamId, positionId: props.positionId } }, e);
 }
 
-/* ------------------------------
-   props.slots の変更監視
------------------------------- */
 watch(
   () => props.slots,
   (v) => {
@@ -216,11 +208,8 @@ watch(
   },
   { deep: true }
 );
-
-onMounted(() => {});
-onBeforeUnmount(() => {});
 </script>
 
 <style scoped>
-/* 必要なら調整 */
+/* 微調整あればここで */
 </style>
