@@ -4,12 +4,12 @@
     :class="{ 'opacity-70 bg-gray-100': item.locked }"
     :style="containerStyle"
   >
-    <!-- ドラッグハンドル（ここだけドラッグ可能） -->
+    <!-- ドラッグハンドル部分（コンテナ移動用） -->
     <div
       class="flex justify-between items-center mb-0.5 cursor-move select-none"
       draggable="true"
-      @dragstart="onDragStart"
-      @dragend="onDragEnd"
+      @dragstart="handleDragStart"
+      @dragend="handleDragEnd"
     >
       <template v-if="!item.folded">
         <slot name="header">
@@ -55,6 +55,7 @@
 import { computed } from "vue";
 import { useShiftItem } from "@/composables/useShiftItem";
 import { useShiftStore } from "@/stores/shiftStore";
+import { useDragManager } from "@/composables/useDragManager";
 
 const props = defineProps({
   item: Object,
@@ -63,6 +64,8 @@ const props = defineProps({
 });
 
 const store = useShiftStore();
+const dragManager = useDragManager();
+
 const { toggleLock, toggleFold } = useShiftItem(props.item);
 
 const containerStyle = computed(() => ({
@@ -71,21 +74,45 @@ const containerStyle = computed(() => ({
   overflowY: "visible",
 }));
 
+/* -------------------------
+  複製 & 削除
+------------------------- */
 const duplicateItem = () => {
-  if (props.type === "team") store.duplicateTeam(props.list[0]?.date, props.item.id);
-  if (props.type === "position") store.duplicatePosition(props.list[0]?.teamId, props.item.positionId);
+  if (props.type === "team") {
+    store.duplicateTeam(props.list[0]?.date, props.item.id);
+  }
+  if (props.type === "position") {
+    store.duplicatePosition(props.list[0]?.teamId, props.item.positionId);
+  }
 };
 
 const removeItem = () => {
-  if (props.type === "team") store.removeTeam(props.list[0]?.date, props.item.id);
-  if (props.type === "position") store.removePosition(props.list[0]?.teamId, props.item.positionId);
+  if (props.type === "team") {
+    store.removeTeam(props.list[0]?.date, props.item.id);
+  }
+  if (props.type === "position") {
+    store.removePosition(props.list[0]?.teamId, props.item.positionId);
+  }
 };
 
-const onDragStart = (e) => {
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("application/json", JSON.stringify(props.item));
+/* -------------------------
+  ドラッグ（移動用） dragManager に統一
+------------------------- */
+const handleDragStart = (e) => {
+  dragManager.startDrag(
+    "container",
+    {
+      type: props.type,
+      item: props.item,
+      list: props.list,
+    },
+    e
+  );
 };
-const onDragEnd = () => {};
+
+const handleDragEnd = () => {
+  // 特に後処理無し
+};
 </script>
 
 <style scoped>
