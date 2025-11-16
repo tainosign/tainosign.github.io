@@ -1,61 +1,43 @@
+<!-- src/components/shift/ShiftPosition.vue -->
 <template>
-  <ShiftContainer
-    :item="position"
-    type="position"
-    :containerWidth="positionWidth"
-    :context="{ date: shiftDate, teamId: teamId, positionId: position.positionId }"
-    @duplicate="onDuplicate"
-    @remove="onRemove"
-  >
-    <template #header>
-      <div class="flex justify-between items-center mb-1">
-        <input
-          v-model="positionName"
-          class="border rounded px-2 py-1 text-sm w-40"
-          placeholder="ポジション名"
-        />
-        <button
-          @click="addSlot"
-          class="bg-green-500 text-white text-xs px-2 py-1 rounded"
-        >
-          ＋スロット
-        </button>
-      </div>
-    </template>
-
-    <template #body>
-      <div class="flex flex-row items-start gap-2 overflow-x-auto">
-        <!-- 時間目盛り（左） -->
-        <div class="flex flex-col text-[10px] text-gray-500 items-end pr-2">
-          <div
-            v-for="time in timeMarksDisplay"
-            :key="time"
-            class="h-8 leading-8 border-t border-gray-200"
-          >
-            {{ time }}
+  <div class="position-card bg-transparent" :style="{ minWidth: positionMinWidth }">
+    <ShiftContainer :item="position" :list="[positionWrapper]" type="position" :maxWidth="positionMaxWidth">
+      <template #header>
+        <div class="flex items-center justify-between gap-2">
+          <input
+            v-model="positionName"
+            class="border rounded px-2 py-1 text-sm w-40"
+            placeholder="ポジション名"
+          />
+          <div class="flex items-center gap-1">
+            <button @click.stop="addSlot" class="bg-green-500 text-white text-xs px-2 py-1 rounded">＋スロット</button>
           </div>
         </div>
+      </template>
 
-        <!-- スロット（横方向に並ぶ） -->
-        <div class="flex flex-row gap-2 flex-nowrap">
-          <div
-            v-for="slot in position.slots"
-            :key="slot.slotId"
-            class="flex-shrink-0"
-            :style="{ width: slotColumnWidth + 'px' }"
-          >
+      <template #body>
+        <div class="flex gap-2 items-start">
+          <!-- 時刻目盛（左端） -->
+          <div class="time-rail text-[10px] text-gray-500 flex flex-col items-end pr-2">
+            <div v-for="time in timeMarks" :key="time" class="h-8 leading-8 border-t border-gray-200">{{ time }}</div>
+          </div>
+
+          <!-- スロット群（横並び） -->
+          <div class="flex gap-2 overflow-x-auto">
             <ShiftSlot
+              v-for="slot in position.slots"
+              :key="slot.slotId"
               :shift-date="shiftDate"
               :team-id="teamId"
               :position-id="position.positionId"
-              :slots="slot.blocks || slot.items || []"
-              @update-slots="onUpdateSlots(slot.slotId, $event)"
+              :slots="slot.blocks || slot.slots || []"
+              :position="position"
             />
           </div>
         </div>
-      </div>
-    </template>
-  </ShiftContainer>
+      </template>
+    </ShiftContainer>
+  </div>
 </template>
 
 <script setup>
@@ -68,11 +50,13 @@ const props = defineProps({
   shiftDate: String,
   teamId: String,
   position: Object,
+  maxWidth: { type: String, default: null },
 });
 
 const store = useShiftStore();
-const positionName = ref(props.position.name || "");
 
+const positionWrapper = computed(() => ({ ...props.position, teamId: props.teamId, date: props.shiftDate }));
+const positionName = ref(props.position.name || "");
 watch(positionName, (v) => {
   props.position.name = v;
 });
@@ -81,26 +65,25 @@ const addSlot = () => {
   store.addSlot(props.shiftDate, props.teamId, props.position.positionId);
 };
 
-const slotColumnWidth = 360;
-const positionWidth = computed(() => {
-  const slotsCount = props.position.slots?.length || 1;
-  return Math.max(320, slotsCount * slotColumnWidth);
-});
-
-// 7:00〜19:00 の 10分刻みメモリ（表示用を短く）
-const timeMarksDisplay = computed(() => {
+// time marks (7:00-19:00 / 10min step)
+const timeMarks = computed(() => {
   const arr = [];
   for (let h = 7; h <= 19; h++) {
-    arr.push(`${String(h).padStart(2, "0")}:00`);
+    for (let m = 0; m < 60; m += 60) { // display on each hour only (visual)
+      if (h === 19 && m > 0) break;
+      arr.push(`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
+    }
   }
   return arr;
 });
 
-const onUpdateSlots = (slotId, newSlots) => {
-  // slot 内のブロック情報を position に反映する（簡易）
-  const sIndex = props.position.slots.findIndex((s) => s.slotId === slotId);
-  if (sIndex === -1) return;
-  // store にも反映可能だがここはローカル更新
-  props.position.slots[sIndex].blocks = newSlots;
-};
+const positionMaxWidth = computed(() => props.maxWidth ?? "320px");
+const positionMinWidth = computed(() => "280px");
 </script>
+
+<style scoped>
+.position-card {
+  box-sizing: border-box;
+}
+.time-rail { width: 48px; }
+</style>
