@@ -1,15 +1,14 @@
 <!-- src/components/shift/ShiftSlot.vue -->
 <template>
-  <div class="border rounded p-1 bg-white relative">
-    <!-- 小さなツールバー -->
-    <div class="flex justify-end gap-1 mb-1">
-      <button class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">…</button>
-      <button class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
-      <button class="text-[10px] bg-red-100 px-1 py-0.5 rounded">✖</button>
-    </div>
-
-    <div class="text-[10px] text-gray-600 font-semibold mb-0.5 text-center">
-      タイムライン（7:00〜19:00）
+  <div class="slot-card border rounded p-1 bg-white relative" :style="{ minWidth: slotMinWidth }">
+    <!-- ヘッダ：タイトル + 操作（ドラッグはメンバー側で） -->
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-xs font-semibold">タイムライン（7:00〜19:00）</div>
+      <div class="flex items-center gap-1">
+        <!-- 小さな操作群（タイムライン上でもコピー/削除など） -->
+        <button @click.stop="onCopy" class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">📄</button>
+        <button @click.stop="onClear" class="text-[10px] bg-red-100 px-1 py-0.5 rounded">✖</button>
+      </div>
     </div>
 
     <div
@@ -18,66 +17,40 @@
       @dragover.prevent="onDragOver"
       @drop.prevent="onDrop"
     >
-      <!-- 10分ごとの目盛 -->
-      <div
-        v-for="(t, i) in timeLabels"
-        :key="i"
-        :style="{ top: `${(i / (timeLabels.length - 1)) * 100}%` }"
-        class="absolute left-0 w-full text-[9px] text-gray-400 select-none"
-      >
-        <div
-          class="absolute -left-10 w-8 text-right pr-1 text-[9px] text-gray-500"
-          :style="{ transform: 'translateY(-50%)' }"
-        >
+      <!-- 時刻目盛（左端、絶対配置） -->
+      <div class="absolute left-0 top-0 bottom-0 w-12 flex flex-col">
+        <div v-for="(t,i) in hourMarks" :key="i" class="h-12 border-t border-gray-200 text-xs text-gray-500 flex items-center justify-end pr-1">
           {{ t }}
         </div>
-        <div
-          class="h-[1px]"
-          :class="t.endsWith(':00') ? 'bg-gray-400' : 'bg-gray-200'"
-          style="width: calc(100% - 32px); margin-left: 32px;"
-        ></div>
       </div>
 
       <!-- スロットブロック（配置済みメンバー） -->
       <div
         v-for="block in localSlots"
         :key="block.id"
-        class="absolute left-12 right-2 bg-white border rounded p-0.5 text-[10px] cursor-move select-none shadow-sm"
+        class="absolute bg-white border rounded p-1 text-[10px] cursor-move select-none shadow-sm"
         :style="blockStyle(block)"
         draggable="true"
-        @dragstart="onBlockDragStart(block, $event)"
+        @dragstart.stop="onBlockDragStart(block, $event)"
         @mousedown.prevent="selectBlock(block, $event)"
       >
-        <!-- 左端時間バッジ -->
-        <div class="absolute -left-10 top-0 text-[9px] text-gray-600 px-0.5" :style="{ transform: 'translateY(4px)' }">
-          {{ minutesToHHMM(block.start_min) }}
-        </div>
-
-        <div class="flex justify-between items-center pl-1">
+        <div class="flex justify-between items-center gap-2">
           <div class="truncate">{{ block.memberName || '未割当' }}</div>
-          <div class="text-[9px] text-gray-500">{{ formatBlockTime(block) }}</div>
+          <div class="text-[9px] text-gray-500">{{ minutesToHHMM(block.start_min) }}</div>
         </div>
 
-        <div class="flex justify-between mt-0.5">
+        <div class="flex justify-between mt-1">
           <button class="text-[9px] px-1 border rounded" @click.stop="changeDuration(block, -10)">-</button>
           <button class="text-[9px] px-1 border rounded" @click.stop="changeDuration(block, 10)">+</button>
           <button class="text-[9px] px-1 border rounded text-red-600" @click.stop="removeBlock(block.id)">✖</button>
         </div>
       </div>
     </div>
-
-    <div v-if="selectedBlock" class="mt-1 text-[10px]">
-      <div>選択中: <strong>{{ selectedBlock.memberName || '未割当' }}</strong></div>
-      <div class="text-gray-600">
-        開始: {{ minutesToHHMM(selectedBlock.start_min) }} /
-        長さ: {{ selectedBlock.duration_min }}分
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useDragManager } from "@/composables/useDragManager";
 import { useShiftStore } from "@/stores/shiftStore";
 
@@ -85,11 +58,11 @@ const props = defineProps({
   shiftDate: { type: String, required: false },
   teamId: { type: String, required: false },
   positionId: { type: String, required: false },
-  position: Object,
-  slots: { type: Array, default: () => [] }, // expected to be array of block objects
+  position: { type: Object, default: () => ({}) },
+  slots: { type: Array, default: () => [] },
 });
-const emit = defineEmits(["update-slots"]);
 
+const emit = defineEmits(["update-slots"]);
 const dragManager = useDragManager();
 const store = useShiftStore();
 
@@ -98,23 +71,18 @@ const startHour = 7;
 const endHour = 19;
 const totalMinutes = (endHour - startHour) * 60;
 const gridUnit = 10;
-const localSlots = ref((props.slots || []).map((s) => ({ ...s })));
+const localSlots = ref((props.slots || []).map(s => ({ ...s })));
 
-// 時刻ラベル
-const timeLabels = computed(() => {
+// hour marks for left column
+const hourMarks = computed(() => {
   const arr = [];
   for (let h = startHour; h <= endHour; h++) {
-    for (let m = 0; m < 60; m += gridUnit) {
-      if (h === endHour && m > 0) break;
-      arr.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
+    arr.push(String(h).padStart(2,"0") + ":00");
   }
   return arr;
 });
 
-function onDragOver(e) {
-  e.dataTransfer.dropEffect = "move";
-}
+function onDragOver(e) { e.dataTransfer.dropEffect = "move"; }
 
 function onDrop(e) {
   try {
@@ -127,7 +95,6 @@ function onDrop(e) {
       const y = e.clientY - rect.top;
       const minutesFromTop = Math.round((y / rect.height) * totalMinutes / gridUnit) * gridUnit;
       const start_min = startHour * 60 + minutesFromTop;
-
       const block = {
         id: `blk_${Date.now()}`,
         memberId: payload.id || payload.uid || null,
@@ -135,27 +102,30 @@ function onDrop(e) {
         start_min,
         duration_min: 60,
       };
-
       localSlots.value.push(block);
       emit("update-slots", localSlots.value);
 
+      // store 反映
       if (props.shiftDate && props.teamId && props.positionId) {
-        store.assignMemberToSlot?.(
-          props.shiftDate,
-          props.teamId,
-          props.positionId,
-          {
-            id: block.id,
-            memberId: block.memberId,
-            memberName: block.memberName,
-            start_min: block.start_min,
-            duration_min: block.duration_min,
-          }
-        );
+        store.assignMemberToSlot(props.shiftDate, props.teamId, props.positionId, {
+          id: block.id,
+          memberId: block.memberId,
+          memberName: block.memberName,
+          start_min: block.start_min,
+          duration_min: block.duration_min,
+        });
       }
+    } else if (dragType === "slotBlock") {
+      // 移動された既存ブロック： payload に元情報があるはず
+      // シンプルな実装：既存 block を新位置に追加して old を消す（store 更新は省略）
+      const rect = timelineRef.value.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const minutesFromTop = Math.round((y / rect.height) * totalMinutes / gridUnit) * gridUnit;
+      const start_min = startHour * 60 + minutesFromTop;
+      const newBlock = { ...payload, id: `blk_${Date.now()}`, start_min };
+      localSlots.value.push(newBlock);
+      emit("update-slots", localSlots.value);
     }
-
-    // slotBlock（既にあるブロックの移動）等の処理も later
   } catch (err) {
     console.error("ShiftSlot.onDrop parse error:", err);
   }
@@ -164,16 +134,21 @@ function onDrop(e) {
 function blockStyle(block) {
   const topRatio = (block.start_min - startHour * 60) / totalMinutes;
   const heightRatio = block.duration_min / totalMinutes;
+  const top = Math.max(0, topRatio * 100);
+  const height = Math.max(2, heightRatio * 100);
+  // left offset to consider left time rail (48px) + small padding
   return {
-    top: `${Math.max(0, topRatio * 100)}%`,
-    height: `${Math.max(2, heightRatio * 100)}%`,
+    left: `56px`,
+    top: `${top}%`,
+    height: `${height}%`,
+    right: `8px`,
   };
 }
 
 function minutesToHHMM(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
 }
 
 function formatBlockTime(block) {
@@ -188,28 +163,40 @@ function changeDuration(block, delta) {
 }
 
 function removeBlock(id) {
-  localSlots.value = localSlots.value.filter((b) => b.id !== id);
+  localSlots.value = localSlots.value.filter(b => b.id !== id);
   emit("update-slots", localSlots.value);
 }
 
 const selectedBlock = ref(null);
-function selectBlock(block, ev) {
-  selectedBlock.value = block;
-}
+function selectBlock(block, ev) { selectedBlock.value = block; }
 
+// ドラッグ開始（既存ブロックを移動）
 function onBlockDragStart(block, e) {
-  dragManager.startDrag("slotBlock", { block, from: { shiftDate: props.shiftDate, teamId: props.teamId, positionId: props.positionId } }, e);
+  dragManager.startDrag("slotBlock", block, e);
 }
 
-watch(
-  () => props.slots,
-  (v) => {
-    localSlots.value = (v || []).map((s) => ({ ...s }));
-  },
-  { deep: true }
-);
+// ヘッダ操作
+function onCopy() {
+  // 簡易コピー: 現在の localSlots を複製して追加
+  const clones = localSlots.value.map(s => ({ ...s, id: `blk_${Date.now()}_${Math.random().toString(36).slice(2,6)}` }));
+  localSlots.value.push(...clones);
+  emit("update-slots", localSlots.value);
+}
+function onClear() {
+  localSlots.value = [];
+  emit("update-slots", localSlots.value);
+}
+
+watch(() => props.slots, (v) => {
+  localSlots.value = (v || []).map(s => ({ ...s }));
+}, { deep: true });
+
+const slotMinWidth = "320px";
 </script>
 
 <style scoped>
-/* 微調整あればここで */
+.slot-card {
+  box-sizing: border-box;
+}
+/* スロット上の時間はブロック右に出すのではなく左端の rail で表示するため、ブロックは left を 56px に設定 */
 </style>
