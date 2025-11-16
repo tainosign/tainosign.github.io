@@ -1,21 +1,15 @@
+<!-- src/components/shift/ShiftTeam.vue -->
 <template>
-  <ShiftContainer
-    :item="team"
-    type="team"
-    :containerWidth="teamWidth"
-    :context="{ date: shiftDate, teamId: team.id }"
-    @duplicate="onDuplicate"
-    @remove="onRemove"
-  >
+  <ShiftContainer :item="team" :list="[teamWrapper]" type="team" :maxWidth="teamWidth">
     <template #header>
-      <div class="flex justify-between items-center mb-1">
+      <div class="flex items-center gap-2">
         <input
           v-model="team.name"
           placeholder="チーム名"
-          class="border rounded px-2 py-1 text-sm w-32"
+          class="border rounded px-2 py-1 text-sm w-full"
         />
         <button
-          @click="addPosition"
+          @click.stop="addPosition"
           class="bg-blue-500 text-white text-xs px-2 py-1 rounded"
         >
           ＋ポジション
@@ -24,17 +18,17 @@
     </template>
 
     <template #body>
-      <ScrollableRow>
+      <!-- positions 横並び。増えれば横スクロール -->
+      <div class="flex gap-3 overflow-x-auto py-2" :style="{ alignItems: 'flex-start' }">
         <ShiftPosition
           v-for="position in team.positions"
           :key="position.positionId"
           :shift-date="shiftDate"
           :team-id="team.id"
           :position="position"
-          @duplicate="onPositionDuplicate"
-          @remove="onPositionRemove"
+          :maxWidth="positionWidth"
         />
-      </ScrollableRow>
+      </div>
     </template>
   </ShiftContainer>
 </template>
@@ -43,47 +37,40 @@
 import { computed } from "vue";
 import ShiftContainer from "./ShiftContainer.vue";
 import ShiftPosition from "./ShiftPosition.vue";
-import ScrollableRow from "../common/ScrollableRow.vue";
 import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
   team: Object,
   shiftDate: String,
+  // parent can pass available width; else we compute
+  parentWidth: { type: Number, default: null },
+  maxWidth: { type: String, default: null },
 });
 
 const store = useShiftStore();
+
+// wrapper to keep expected list[0].date for ShiftContainer store ops
+const teamWrapper = computed(() => ({ ...props.team, date: props.shiftDate }));
 
 const addPosition = () => {
   store.addPosition(props.shiftDate, props.team.id);
 };
 
+// 幅計算：チームは親幅の半分（あなたの指定式に沿って近似）
 const teamWidth = computed(() => {
-  // チーム幅はポジション数に依存させる（1ポジション=360px）
-  const posCount = props.team.positions?.length || 1;
-  return Math.max(320, posCount * 360);
+  // If parent passed CSS maxWidth string, use it; otherwise fallback to calc
+  if (props.maxWidth) return props.maxWidth;
+  // Use calc to allow padding/margin room; user asked formula -> we approximate with calc
+  return "calc((100% - 24px) / 2)"; // 24px は想定 padding+margin。調整可。
 });
 
-const onDuplicate = (payload) => {
-  // bubble up to parent (ShiftDate)
-  // payload from ShiftContainer already contains item and context
-  // but ShiftDate expects team duplication via store. Here we emit event upward:
-  // emit('duplicate'...) handled by parent via @duplicate - but we're inside Setup so:
-  // use $emit isn't available; use defineEmits
-};
-const emits = defineEmits(["duplicate", "remove", "position-duplicate", "position-remove"]);
-
-// forward handlers
-const onPositionDuplicate = ({ item }) => {
-  emits("position-duplicate", { position: item, teamId: props.team.id, shiftDate: props.shiftDate });
-};
-const onPositionRemove = ({ item }) => {
-  emits("position-remove", { position: item, teamId: props.team.id, shiftDate: props.shiftDate });
-};
-
-const onDuplicateLocal = (payload) => {
-  emits("duplicate", { team: props.team, shiftDate: props.shiftDate });
-};
-const onRemoveLocal = (payload) => {
-  emits("remove", { team: props.team, shiftDate: props.shiftDate });
-};
+// Position 幅（内側でさらに調整）
+const positionWidth = computed(() => {
+  // make position slightly smaller than team container
+  return "calc( ( " + teamWidth.value + " ) - 20px )";
+});
 </script>
+
+<style scoped>
+/* 親の overflow に合わせた見た目 */
+</style>
