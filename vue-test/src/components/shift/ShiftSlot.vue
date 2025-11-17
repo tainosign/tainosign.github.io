@@ -1,9 +1,9 @@
 <template>
   <div class="shift-slot-root" :style="{ padding: cssPad }">
     <!-- タイトル（任意） -->
-    <div class="slot-title text-xs text-gray-600 mb-1">
+<!--     <div class="slot-title text-xs text-gray-600 mb-1">
       タイムライン（{{ padHour(startHour) }}:00〜{{ padHour(endHour) }}:00）
-    </div>
+    </div> -->
 
     <!-- タイムライン本体（縦に積むブロック群） -->
     <div
@@ -38,7 +38,7 @@
 
           <!-- ブロック本体（横長） -->
           <div
-            class="block-body flex items-center overflow-hidden relative"
+            class="block-body flex items-center relative"
             :style="blockBodyStyle(block)"
             @mousedown.prevent="selectBlock(block, $event)"
           >
@@ -319,7 +319,8 @@ onBeforeUnmount(() => {
   border-left: none;
   box-sizing: border-box;
   position: relative;
-  overflow: visible;
+  /* overflow: visible; */
+  padding-right: 60px;
 }
 
 /* controls inside block (absolute at right) */
