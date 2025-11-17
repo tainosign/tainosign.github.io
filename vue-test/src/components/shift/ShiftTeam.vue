@@ -1,5 +1,10 @@
 <template>
-  <ShiftContainer :item="team" :list="[team]" type="team" :timelineWidthPx="timelineWidthPx">
+  <ShiftContainer
+    :item="team"
+    :list="[ { date: shiftDate } ]"
+    type="team"
+    :timelineWidthPx="timelineWidthPx"
+  >
     <template #header>
       <div class="flex flex-col">
         <div class="flex items-center gap-2">
@@ -10,20 +15,18 @@
     </template>
 
     <template #body>
-      <div class="flex gap-2 items-start">
-        <!-- ポジションは横並び（スクロール可） -->
-        <div class="flex gap-2 overflow-x-auto">
-          <ShiftPosition
-            v-for="position in team.positions"
-            :key="position.positionId"
-            :shift-date="shiftDate"
-            :team-id="team.id"
-            :position="position"
-            :timelineWidthPx="timelineWidthPx"
-            :unitPer10Min="unitPer10Min"
-            @update-position="emitUpdate"
-          />
-        </div>
+      <!-- ポジションを縦に積む -->
+      <div class="flex flex-col gap-2">
+        <ShiftPosition
+          v-for="position in team.positions"
+          :key="position.positionId"
+          :shift-date="shiftDate"
+          :team-id="team.id"
+          :position="position"
+          :timelineWidthPx="timelineWidthPx"
+          :unitPer10Min="unitPer10Min"
+          @update-position="emitUpdate"
+        />
       </div>
     </template>
   </ShiftContainer>
