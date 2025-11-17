@@ -48,26 +48,25 @@
 
             <!-- 右端の操作ボタン -->
             <div class="block-controls absolute right-0 top-0 flex gap-1 p-1">
-              <button class="op-btn" @click.stop="decrease(block)">-</button>
-              <button class="op-btn" @click.stop="increase(block)">+</button>
-              <button class="op-btn text-red-600" @click.stop="removeBlock(block.id)">✖</button>
+              <button class="op-btn" @click.stop="decrease(block)" title="短く">-</button>
+              <button class="op-btn" @click.stop="increase(block)" title="長く">+</button>
+              <button class="op-btn text-red-600" @click.stop="removeBlock(block.id)" title="削除">✖</button>
             </div>
           </div>
         </div>
-        <!-- スロット下に時間表示（下部） -->
       </div>
 
       <!-- タイムメモリ（横幅固定、下部に表示するため timeline と同幅） -->
       <div class="time-ruler absolute bottom-0 left-0 w-full pointer-events-none">
         <div class="ruler-inner relative" :style="{ width: timelineWidthPx + 'px' }">
-          <!-- 1時間ごとの目盛（線） -->
+          <!-- 1時間ごとの目盛（線）と数字 -->
           <div
             v-for="h in hourArray"
             :key="h"
             class="hour-mark absolute"
             :style="{ left: ((h - startHour) * 60 / 10 * unitPer10Min) + 'px' }"
           >
-            <div class="h-line" :style="{ height: '8px', width: '1px' }"></div>
+            <div class="h-line" :style="{ height: '8px', width: '1px', margin: '0 auto' }"></div>
             <div class="h-label text-[10px] mt-1 text-gray-600">{{ padHour(h) }}</div>
           </div>
         </div>
@@ -98,7 +97,7 @@ const props = defineProps({
   // visual params
   unitPer10Min: { type: Number, default: 6 }, // 10分あたりのpx（=6 => 1時間=36px）
   slotHeight: { type: Number, default: 40 }, // 各ブロック高さ(px)
-  startHour: { type: Number, default: 6 },
+  startHour: { type: Number, default: 7 },
   endHour: { type: Number, default: 20 },
   blockGap: { type: Number, default: 8 }, // vertical gap between blocks
   pad: { type: String, default: "0.1vw" },
@@ -155,7 +154,7 @@ function onDrop(e) {
     if (!raw) return;
     const { dragType, payload } = JSON.parse(raw);
 
-    // drop member onto timeline -> create new block at y location (append), compute start_min from x position
+    // drop member onto timeline -> create new block at x location
     if (dragType === "member") {
       const rect = timelineRef.value.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -194,7 +193,6 @@ function onDrop(e) {
 
     // moving existing block (slotBlock)
     if (dragType === "slotBlock") {
-      // payload is block; we'll reposition by x coordinate and, to keep simple, assign a new start_min
       const rect = timelineRef.value.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const tenMinUnitsFromLeft = Math.round(x / props.unitPer10Min);
@@ -249,8 +247,8 @@ function selectBlock(block, ev) {
 
 // block drag start (from handle)
 function onBlockHandleDragStart(block, e) {
+  // use dragManager and native transfer for compatibility
   dragManager.startDrag("slotBlock", block, e);
-  // also native transfer for compatibility
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "slotBlock", payload: block }));
 }
@@ -287,7 +285,7 @@ onBeforeUnmount(() => {
   min-height: calc(var(--slot-height, 40px) + 40px); /* allow space for ruler */
   border-radius: 4px;
   box-sizing: border-box;
-  padding-bottom: 32px; /* space for bottom ruler */
+  padding-bottom: 48px; /* space for bottom ruler and labels */
 }
 
 /* wrapper for each block row */
@@ -310,6 +308,8 @@ onBeforeUnmount(() => {
   user-select: none;
   background: transparent;
   border-right: 1px solid #eee;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 /* block body (horizontal width represents time) */
@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
 /* ruler inner uses absolute hour marks */
 .ruler-inner {
   position: relative;
-  height: 32px;
+  height: 48px;
   box-sizing: border-box;
   padding-top: 4px;
 }
@@ -351,13 +351,18 @@ onBeforeUnmount(() => {
   top: 0;
   transform: translateX(-0.5px);
   text-align: center;
+  width: 36px; /* optional visual anchor */
 }
 .hour-mark .h-line {
   background: #cbd5e1;
+  width: 1px;
+  height: 8px;
   margin: 0 auto;
 }
 .hour-mark .h-label {
   margin-top: 4px;
+  font-size: 10px;
+  color: #4b5563;
 }
 
 /* small responsive tweaks */
