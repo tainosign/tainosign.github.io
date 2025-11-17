@@ -32,12 +32,12 @@
       <!-- 右: 操作ボタン群（左上に固める） -->
       <div class="header-actions flex flex-col gap-1 items-start">
         <div class="flex gap-1">
-          <button @click.stop="toggleFold" class="btn-op"> {{ item.folded ? '＋' : '－' }} </button>
-          <button @click.stop="toggleLock" :class="['btn-op', item.locked ? 'locked' : '']">
+          <button @click.stop="toggleFold" class="btn-op" title="折りたたみ"> {{ item.folded ? '＋' : '－' }} </button>
+          <button @click.stop="toggleLock" :class="['btn-op', item.locked ? 'locked' : '']" title="ロック">
             {{ item.locked ? '🔒' : '🔓' }}
           </button>
-          <button @click.stop="onDuplicate" class="btn-op">📄</button>
-          <button v-if="!item.locked" @click.stop="onRemove" class="btn-op text-red-600">✖</button>
+          <button @click.stop="onDuplicate" class="btn-op" title="複製">📄</button>
+          <button v-if="!item.locked" @click.stop="onRemove" class="btn-op text-red-600" title="削除">✖</button>
         </div>
 
         <!-- 下段: 補助領域（追加ボタンなど） -->
