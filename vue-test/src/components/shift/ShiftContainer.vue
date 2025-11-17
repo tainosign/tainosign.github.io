@@ -1,4 +1,3 @@
-<!-- src/components/shift/ShiftContainer.vue -->
 <template>
   <div
     :class="[
@@ -27,7 +26,7 @@
           <div class="font-bold text-sm truncate">{{ item.name }}</div>
         </slot>
 
-        <!-- 追加ボタンを名前の右に配置したいならここに -->
+        <!-- ここに追加ボタンなどのスロット用コントロールを出すことができます -->
       </div>
 
       <!-- 右: 操作ボタン群（左上に固める） -->
@@ -41,7 +40,7 @@
           <button v-if="!item.locked" @click.stop="onRemove" class="btn-op text-red-600">✖</button>
         </div>
 
-        <!-- 下段に小さい補助（例：追加ボタン） -->
+        <!-- 下段: 補助領域（追加ボタンなど） -->
         <div class="mt-1">
           <slot name="header-controls"></slot>
         </div>
@@ -83,8 +82,7 @@ const dragAreaWidth = computed(() => "1vw");
 
 // compute container width:
 // - if explicit timelineWidthPx is provided => use that + drag area + small margins
-// - else try to infer from item (if position => timeline width, if team => max child position width, if shift/date => sum of teams widths)
-// fallback to 100%
+// - else fallback to 100%
 const containerStyle = computed(() => {
   const base = {
     boxSizing: "border-box",
@@ -92,25 +90,10 @@ const containerStyle = computed(() => {
     margin: "0",
   };
 
-  // if timeline width is given, use it (this ensures alignment with ShiftSlot timeline)
   if (props.timelineWidthPx) {
-    // include drag area and small padding
-    const totalPx = props.timelineWidthPx + pxFromString(dragAreaWidth.value) + 4; // +4px buffer
+    const totalPx = props.timelineWidthPx + pxFromString(dragAreaWidth.value) + 8; // buffer
     return { ...base, width: `${totalPx}px` };
   }
-
-  // try inference: if item has positions -> use max slots width among positions
-  try {
-    if (Array.isArray(props.item?.positions)) {
-      // find the maximum number of minutes range across positions' slots
-      // but simpler: use store timeline from shiftStore if present
-      // fallback to 100%
-      return { ...base, width: "100%" };
-    }
-  } catch (e) {
-    // ignore
-  }
-
   return { ...base, width: "100%" };
 });
 
@@ -119,9 +102,7 @@ const onDuplicate = () => {
   if (props.type === "team") {
     store.duplicateTeam(props.list[0]?.date, props.item.id);
   } else if (props.type === "position") {
-    // if parent references include teamId/date, call with them
-    const parent = props.list[0] || {};
-    store.duplicatePosition(parent.date, parent.id, props.item.positionId);
+    store.duplicatePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
   } else {
     duplicate(props.list);
   }
@@ -130,8 +111,7 @@ const onRemove = () => {
   if (props.type === "team") {
     store.removeTeam(props.list[0]?.date, props.item.id);
   } else if (props.type === "position") {
-    const parent = props.list[0] || {};
-    store.removePosition(parent.date, parent.id, props.item.positionId);
+    store.removePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
   } else {
     remove(props.list);
   }
@@ -175,6 +155,7 @@ function pxFromString(str) {
   margin: var(--mar);
   box-sizing: border-box;
   border-radius: 6px;
+  /* remove thick outer border to keep minimal visual noise */
 }
 
 /* header row */
