@@ -25,8 +25,6 @@
         <slot name="header">
           <div class="font-bold text-sm truncate">{{ item.name }}</div>
         </slot>
-
-        <!-- ここに追加ボタンなどのスロット用コントロールを出すことができます -->
       </div>
 
       <!-- 右: 操作ボタン群（左上に固める） -->
@@ -66,9 +64,8 @@ const props = defineProps({
   item: { type: Object, required: true },
   list: { type: Array, default: () => [] }, // parent reference (used by duplications/removals)
   type: { type: String, default: "generic" },
-  // optional explicit timeline width (px) to force alignment; if not provided we try to compute
+  // timelineWidthPx: when provided, compute container width so the timeline fits without inner scroll
   timelineWidthPx: { type: Number, default: null },
-  // padding variable
   pad: { type: String, default: "0.1vw" },
 });
 
@@ -76,24 +73,28 @@ const store = useShiftStore();
 const dragManager = useDragManager();
 const { toggleLock, toggleFold, duplicate, remove } = useShiftItem(props.item);
 
-// CSS helpers
 const cssPad = computed(() => props.pad || "0.1vw");
 const dragAreaWidth = computed(() => "1vw");
 
-// compute container width:
-// - if explicit timelineWidthPx is provided => use that + drag area + small margins
-// - else fallback to 100%
+// compute container width: timelineWidthPx + dragAreaWidth + small buffer
 const containerStyle = computed(() => {
   const base = {
     boxSizing: "border-box",
     padding: "0",
     margin: "0",
+    overflow: "visible",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
   };
 
-  if (props.timelineWidthPx) {
-    const totalPx = props.timelineWidthPx + pxFromString(dragAreaWidth.value) + 8; // buffer
+  if (props.timelineWidthPx && Number.isFinite(props.timelineWidthPx)) {
+    const extra = pxFromString(dragAreaWidth.value) + 12; // handle + padding buffer
+    const totalPx = props.timelineWidthPx + extra;
     return { ...base, width: `${totalPx}px` };
   }
+
+  // fallback to flexible width
   return { ...base, width: "100%" };
 });
 
@@ -120,24 +121,27 @@ const onRemove = () => {
 // drag handle start
 const onHandleDragStart = (e) => {
   const payload = { type: props.type, item: props.item, sourceDate: props.list[0]?.date };
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "shiftItem", payload }));
+  if (e?.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "shiftItem", payload }));
+  }
   dragManager.startDrag("shiftItem", payload, e);
 };
 const onDragEnd = (e) => {
   dragManager.clearDrag();
 };
 
-// small utility to convert px value string or '1vw' to px approximation when needed
+// small utility to convert px/vw/vh string to px
 function pxFromString(str) {
   if (!str) return 0;
-  if (str.endsWith("px")) return Number(str.replace("px", ""));
-  if (str.endsWith("vw")) {
-    const vw = Number(str.replace("vw", ""));
+  if (typeof str === "number") return str;
+  if (String(str).endsWith("px")) return Number(String(str).replace("px", ""));
+  if (String(str).endsWith("vw")) {
+    const vw = Number(String(str).replace("vw", ""));
     return Math.round((vw / 100) * window.innerWidth);
   }
-  if (str.endsWith("vh")) {
-    const vh = Number(str.replace("vh", ""));
+  if (String(str).endsWith("vh")) {
+    const vh = Number(String(str).replace("vh", ""));
     return Math.round((vh / 100) * window.innerHeight);
   }
   return Number(str) || 0;
@@ -155,7 +159,6 @@ function pxFromString(str) {
   margin: var(--mar);
   box-sizing: border-box;
   border-radius: 6px;
-  /* remove thick outer border to keep minimal visual noise */
 }
 
 /* header row */
@@ -163,6 +166,7 @@ function pxFromString(str) {
   display: flex;
   align-items: flex-start;
   gap: 0.2vw;
+  width: 100%;
 }
 
 /* drag area */
@@ -172,7 +176,9 @@ function pxFromString(str) {
   justify-content: center;
   cursor: grab;
   user-select: none;
+  flex-shrink: 0;
 }
+.drag-area:active { cursor: grabbing; }
 .drag-symbol {
   font-size: 14px;
   color: #666;
@@ -190,6 +196,7 @@ function pxFromString(str) {
   border-radius: 6px;
   border: 1px solid #e6e6e6;
   background: #f3f3f3;
+  cursor: pointer;
 }
 .header-actions .btn-op.locked {
   background: #444;
@@ -199,6 +206,7 @@ function pxFromString(str) {
 /* content area */
 .content-area {
   margin-top: 0.25vh;
+  width: 100%;
 }
 
 /* truncate helper */
