@@ -1,6 +1,11 @@
 <template>
   <div class="p-2" :style="{ padding: cssPad }">
-    <ShiftContainer :item="shift" :list="[shift]" type="shift" :timelineWidthPx="timelineWidthPx">
+    <ShiftContainer
+      :item="shift"
+      :list="[ { date: shift.date } ]"
+      type="shift"
+      :timelineWidthPx="timelineWidthPx"
+    >
       <template #header>
         <div class="flex items-center gap-2">
           <span class="font-bold">{{ shift.date }}</span>
@@ -9,8 +14,8 @@
       </template>
 
       <template #body>
-        <!-- チームは横並び（スクロール可） -->
-        <div class="flex gap-2 overflow-x-auto">
+        <!-- チームを縦に積む -->
+        <div class="flex flex-col gap-2">
           <ShiftTeam
             v-for="team in shift.teams"
             :key="team.id"
@@ -34,14 +39,12 @@ import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
   shift: { type: Object, required: true },
-  // 時間→px 換算（10分あたり）
-  unitPer10Min: { type: Number, default: 6 },
+  unitPer10Min: { type: Number, default: 6 }, // 10分あたりpx
   startHour: { type: Number, default: 7 },
   endHour: { type: Number, default: 20 },
 });
 
 const emit = defineEmits(["update-shift"]);
-
 const store = useShiftStore();
 
 const totalMinutes = computed(() => (props.endHour - props.startHour) * 60);
@@ -61,5 +64,5 @@ const emitUpdate = () => {
 </script>
 
 <style scoped>
-/* minimal layout */
+/* minimal */
 </style>
