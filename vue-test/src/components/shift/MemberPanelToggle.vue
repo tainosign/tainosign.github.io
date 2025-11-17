@@ -1,6 +1,5 @@
-<!-- src/components/shift/MemberPanelToggle.vue -->
 <template>
-  <!-- シフト日選択 -->
+  <!-- 日付ボタン群（top-right） -->
   <div class="fixed top-4 right-4 bg-white shadow rounded p-2 z-50 flex gap-2">
     <button
       v-for="d in shiftStore.festivalDays"
@@ -16,13 +15,13 @@
   <!-- メンバー開閉ボタン -->
   <button
     @click="togglePanel"
-    class="fixed top-1/2 transform -translate-y-1/2 bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical transition-all duration-300"
+    class="fixed top-1/2 transform -translate-y-1/2 bg-blue-500 text-white px-2 py-6 rounded shadow text-lg writing-vertical"
     :style="{ right: showPanel ? panelWidth + 'px' : '10px' }"
   >
     メンバー
   </button>
 
-  <!-- メンバーパネル -->
+  <!-- パネル -->
   <transition name="slide">
     <div
       v-if="showPanel"
@@ -30,27 +29,21 @@
       :style="{ width: panelWidth + 'px' }"
     >
       <div class="flex justify-between items-center mb-2">
-        <button
-          @click="autoAssign"
-          class="bg-green-500 text-white px-2 py-1 rounded"
-        >
-          自動配置
-        </button>
-
+        <button @click="autoAssign" class="bg-green-500 text-white px-2 py-1 rounded">自動配置</button>
         <select v-model="filterStatus" class="border rounded p-1 text-sm">
           <option value="unassigned">未配置</option>
           <option value="assigned">配置済み</option>
         </select>
       </div>
 
-      <div
-        v-for="m in filteredMembers"
-        :key="m.id"
-        class="border rounded p-2 mb-2 shadow-sm bg-white cursor-move hover:bg-blue-50 transition"
-        draggable="true"
-        @dragstart="onDragStart(m, $event)"
-      >
-        <div class="font-semibold">{{ m.name_kanji || m.name }}</div>
+      <div>
+        <div
+          v-for="m in filteredMembers"
+          :key="m.id"
+          class="border rounded p-2 mb-2 shadow-sm bg-white cursor-move hover:bg-blue-50 transition flex items-center"
+        >
+          <ShiftMember :member="m" />
+        </div>
       </div>
     </div>
   </transition>
@@ -60,12 +53,12 @@
 import { ref, computed, onMounted } from "vue";
 import { useShiftStore } from "@/stores/shiftStore";
 import { useMemberStore } from "@/stores/memberStore";
+import ShiftMember from "./ShiftMember.vue";
 import { useDragManager } from "@/composables/useDragManager";
 
 const dragManager = useDragManager();
-
 const showPanel = ref(false);
-const panelWidth = 400;
+const panelWidth = 360;
 const filterStatus = ref("unassigned");
 
 const shiftStore = useShiftStore();
@@ -79,7 +72,7 @@ onMounted(async () => {
 const filteredMembers = computed(() => {
   const activeShift = shiftStore.getShiftForActiveDay?.();
   const assignedIds =
-    activeShift?.slots?.flatMap((slot) => slot.members?.map((m) => m.id) || []) || [];
+    activeShift?.teams?.flatMap((t) => t.positions?.flatMap((p) => (p.slots || []).flatMap(s => (s.members||[]).map(m=>m.id) || [])) ) || [];
 
   return (memberStore.members || []).filter((m) => {
     const assigned = assignedIds.includes(m.id);
@@ -90,35 +83,13 @@ const filteredMembers = computed(() => {
 });
 
 const togglePanel = () => (showPanel.value = !showPanel.value);
-
-const onDragStart = (member, e) => {
-  // dragManager 経由で統一的に開始
-  dragManager.startDrag("member", member, e);
-  // 互換のために保持も
-  dragManager.startDragMember(member, e);
-  console.log("MemberPanelToggle: start drag", member);
-};
-
-const autoAssign = () => {
-  console.log("自動配置機能（後で実装）");
-};
+const autoAssign = () => console.log("autoAssign TODO");
 </script>
 
 <style scoped>
-.writing-vertical {
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  letter-spacing: 0.2em;
-}
-
 .slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease;
-}
-.slide-enter-from {
-  transform: translateX(100%);
-}
-.slide-leave-to {
-  transform: translateX(100%);
-}
+.slide-leave-active { transition: transform 0.3s ease; }
+.slide-enter-from { transform: translateX(100%); }
+.slide-leave-to { transform: translateX(100%); }
+.writing-vertical { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.2em; }
 </style>
