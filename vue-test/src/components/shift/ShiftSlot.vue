@@ -1,73 +1,62 @@
 <template>
   <div class="shift-slot-root" :style="{ padding: cssPad }">
-    <!-- タイトル（任意） -->
-<!--     <div class="slot-title text-xs text-gray-600 mb-1">
-      タイムライン（{{ padHour(startHour) }}:00〜{{ padHour(endHour) }}:00）
-    </div> -->
-
     <!-- タイムライン本体（縦に積むブロック群） -->
     <div
-      class="timeline bg-gray-50 relative overflow-auto"
+      class="timeline bg-gray-50 relative"
       ref="timelineRef"
       @dragover.prevent="onDragOver"
       @drop.prevent="onDrop"
-      :style="{ minWidth: timelineWidthPx + 'px' }"
+      :style="{ width: timelineWidthPx + 'px', minWidth: timelineWidthPx + 'px' }"
     >
-      <!-- 縦に並ぶ各ブロック（配置されたメンバー） -->
+      <!-- 各ブロック行（縦積み） -->
       <div
         v-for="(block, idx) in localSlots"
         :key="block.id"
         class="member-block-wrapper"
-        :style="{ height: slotHeight + 'px', marginBottom: blockGap + 'px' }"
+        :style="{ height: slotHeight + 'px', marginBottom: blockGap + 'px', position: 'relative' }"
       >
+        <!-- 左ドラッグ領域（固定幅）と可視化は block-drag-handle の中で行う -->
         <div
-          class="member-block flex items-stretch h-full"
-          :class="{'bg-white': true, 'shadow-sm': true}"
+          class="block-drag-handle"
+          :style="{ left: '0px', top: '0px', height: slotHeight + 'px', width: dragAreaWidth }"
+          draggable="true"
+          @dragstart.stop="onBlockHandleDragStart(block, $event)"
+          @dragend.stop="onDragEnd"
+          title="このハンドルでブロックを移動"
         >
-          <!-- 左ドラッグ領域（1vw幅） -->
-          <div
-            class="block-drag-handle flex-shrink-0"
-            :style="{ width: dragAreaWidth }"
-            draggable="true"
-            @dragstart.stop="onBlockHandleDragStart(block, $event)"
-            @dragend.stop="onDragEnd"
-            title="このハンドルでブロックを移動"
-          >
-            ⋮
+          <div class="drag-symbol">⋮</div>
+        </div>
+
+        <!-- ブロック本体を絶対配置で left を決める -->
+        <div
+          class="block-body"
+          :style="blockBodyStyle(block)"
+          @mousedown.prevent="selectBlock(block, $event)"
+        >
+          <div class="px-1 truncate text-sm">
+            {{ block.memberName || '未割当' }}
           </div>
 
-          <!-- ブロック本体（横長） -->
-          <div
-            class="block-body flex items-center relative"
-            :style="blockBodyStyle(block)"
-            @mousedown.prevent="selectBlock(block, $event)"
-          >
-            <div class="px-1 truncate text-sm">
-              {{ block.memberName || '未割当' }}
-            </div>
-
-            <!-- 右端の操作ボタン -->
-            <div class="block-controls absolute right-0 top-0 flex gap-1 p-1">
-              <button class="op-btn" @click.stop="decrease(block)" title="短く">-</button>
-              <button class="op-btn" @click.stop="increase(block)" title="長く">+</button>
-              <button class="op-btn text-red-600" @click.stop="removeBlock(block.id)" title="削除">✖</button>
-            </div>
+          <!-- 操作ボタン（絶対配置） -->
+          <div class="block-controls">
+            <button class="op-btn" @click.stop="decrease(block)" title="短く">-</button>
+            <button class="op-btn" @click.stop="increase(block)" title="長く">+</button>
+            <button class="op-btn text-red-600" @click.stop="removeBlock(block.id)" title="削除">✖</button>
           </div>
         </div>
       </div>
 
-      <!-- タイムメモリ（横幅固定、下部に表示するため timeline と同幅） -->
+      <!-- タイムメモリ（下部） -->
       <div class="time-ruler absolute bottom-0 left-0 w-full pointer-events-none">
         <div class="ruler-inner relative" :style="{ width: timelineWidthPx + 'px' }">
-          <!-- 1時間ごとの目盛（線）と数字 -->
           <div
             v-for="h in hourArray"
             :key="h"
-            class="hour-mark absolute"
+            class="hour-mark"
             :style="{ left: ((h - startHour) * 60 / 10 * unitPer10Min) + 'px' }"
           >
-            <div class="h-line" :style="{ height: '8px', width: '1px', margin: '0 auto' }"></div>
-            <div class="h-label text-[10px] mt-1 text-gray-600">{{ padHour(h) }}</div>
+            <div class="h-line"></div>
+            <div class="h-label">{{ padHour(h) }}</div>
           </div>
         </div>
       </div>
@@ -91,15 +80,14 @@ const props = defineProps({
   teamId: { type: String, required: false },
   positionId: { type: String, required: false },
 
-  // store の slots 形状に合わせる。localSlots の各要素は { id, memberId, memberName, start_min, duration_min }
   slots: { type: Array, default: () => [] },
 
   // visual params
-  unitPer10Min: { type: Number, default: 6 }, // 10分あたりのpx（=6 => 1時間=36px）
-  slotHeight: { type: Number, default: 40 }, // 各ブロック高さ(px)
+  unitPer10Min: { type: Number, default: 6 }, // 10min -> px
+  slotHeight: { type: Number, default: 40 },
   startHour: { type: Number, default: 7 },
   endHour: { type: Number, default: 20 },
-  blockGap: { type: Number, default: 8 }, // vertical gap between blocks
+  blockGap: { type: Number, default: 8 },
   pad: { type: String, default: "0.1vw" },
 });
 
@@ -112,18 +100,17 @@ const timelineRef = ref(null);
 const selectedBlock = ref(null);
 
 const cssPad = computed(() => props.pad || "0.1vw");
-// const dragAreaWidth = computed(() => "1vw");
-  const dragAreaWidth = computed(() => "20px");
+// drag area width — fixed px for reliability (approx 1vw)
+const dragAreaWidth = computed(() => `${Math.max(20, Math.round(window.innerWidth * 0.01))}px`);
 
 // compute timeline width px from startHour/endHour
 const timelineWidthPx = computed(() => {
   const hours = props.endHour - props.startHour;
-  // total 10min units = hours * 6 (per hour 6 units of 10min)
-  const tenMinUnits = hours * 6;
+  const tenMinUnits = hours * 6; // 6 units/hour
   return tenMinUnits * props.unitPer10Min;
 });
 
-// local copy of slots for immediate UI update
+// local copy of slots
 const localSlots = ref((props.slots || []).map(s => ({ ...s })));
 
 // hour ticks array
@@ -133,7 +120,6 @@ const hourArray = computed(() => {
   return arr;
 });
 
-// helper: convert minutes to HH:MM
 function minutesToHHMM(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -148,18 +134,16 @@ function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
-// Drop: parse member drop
+// Drop handler (同じ)
 function onDrop(e) {
   try {
     const raw = e.dataTransfer.getData("application/json");
     if (!raw) return;
     const { dragType, payload } = JSON.parse(raw);
 
-    // drop member onto timeline -> create new block at x location
     if (dragType === "member") {
       const rect = timelineRef.value.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      // convert x to minutes from startHour
       const tenMinUnitsFromLeft = Math.round(x / props.unitPer10Min);
       const minutesFromStart = tenMinUnitsFromLeft * 10;
       const start_min = props.startHour * 60 + minutesFromStart;
@@ -169,13 +153,12 @@ function onDrop(e) {
         memberId: payload.id || payload.uid || null,
         memberName: payload.name_kanji || payload.name || "メンバー",
         start_min,
-        duration_min: 60, // default 60min
+        duration_min: 60,
       };
 
       localSlots.value.push(block);
       emit("update-slots", localSlots.value);
 
-      // persist to store if shiftDate/teamId/positionId provided
       if (props.shiftDate && props.teamId && props.positionId) {
         store.assignMemberToSlot?.(
           props.shiftDate,
@@ -192,7 +175,6 @@ function onDrop(e) {
       }
     }
 
-    // moving existing block (slotBlock)
     if (dragType === "slotBlock") {
       const rect = timelineRef.value.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -200,7 +182,6 @@ function onDrop(e) {
       const minutesFromStart = tenMinUnitsFromLeft * 10;
       const start_min = props.startHour * 60 + minutesFromStart;
 
-      // find target block in localSlots (by id)
       const idx = localSlots.value.findIndex(b => b.id === payload.id);
       if (idx !== -1) {
         localSlots.value[idx].start_min = start_min;
@@ -212,22 +193,40 @@ function onDrop(e) {
   }
 }
 
-// block style: width by duration, left offset by start_min
+// block style: absolute left/top
 function blockBodyStyle(block) {
   const minutesFromStart = block.start_min - props.startHour * 60;
   const leftPx = Math.max(0, (minutesFromStart / 10) * props.unitPer10Min);
   const widthPx = Math.max(10, (block.duration_min / 10) * props.unitPer10Min);
+
+  // leave some left margin to account for drag handle space visually (drag handle sits at x=0)
+  const handleOffset = pxValue(dragAreaWidth.value);
+
   return {
+    position: "absolute",
+    left: `${leftPx + handleOffset}px`,
+    top: `0px`,
     width: `${widthPx}px`,
-    marginLeft: `${leftPx}px`,
     height: `${props.slotHeight}px`,
     display: "flex",
     alignItems: "center",
-    position: "relative",
+    background: "#fff",
+    border: "1px solid #e2e8f0",
+    boxSizing: "border-box",
+    paddingRight: "60px", // space for controls
+    overflow: "visible",
+    zIndex: 1,
   };
 }
 
-// decrease/increase duration in 10min steps
+function pxValue(val) {
+  if (!val) return 0;
+  if (String(val).endsWith("px")) return Number(String(val).replace("px", ""));
+  if (String(val).endsWith("vw")) return Math.round((Number(val.replace("vw",""))/100) * window.innerWidth);
+  return Number(val) || 0;
+}
+
+// duration adjust
 function increase(block) {
   block.duration_min = block.duration_min + 10;
   emit("update-slots", localSlots.value);
@@ -246,114 +245,118 @@ function selectBlock(block, ev) {
   selectedBlock.value = block;
 }
 
-// block drag start (from handle)
+// drag start for block
 function onBlockHandleDragStart(block, e) {
-  // use dragManager and native transfer for compatibility
   dragManager.startDrag("slotBlock", block, e);
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "slotBlock", payload: block }));
-}
-function onBlockDragStart(block, e) {
-  // fallback if needed
-  onBlockHandleDragStart(block, e);
+  if (e?.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "slotBlock", payload: block }));
+  }
 }
 function onDragEnd(e) {
   dragManager.clearDrag();
 }
 
-// watch incoming props.slots and keep local in sync
+// keep local in sync
 watch(() => props.slots, (v) => {
   localSlots.value = (v || []).map(s => ({ ...s }));
 }, { deep: true });
 
-onMounted(() => {
-  // optional: register handler if needed
-});
-onBeforeUnmount(() => {
-  // optional cleanup
-});
+onMounted(() => {});
+onBeforeUnmount(() => {});
 </script>
 
 <style scoped>
 .shift-slot-root { width: 100%; box-sizing: border-box; }
 
-/* padding variable usage */
-.slot-title { padding-left: 0.1vw; }
-
 /* timeline container */
 .timeline {
   position: relative;
-  min-height: calc(var(--slot-height, 40px) + 40px); /* allow space for ruler */
-  border-radius: 4px;
   box-sizing: border-box;
-  padding-bottom: 48px; /* space for bottom ruler and labels */
+  padding-bottom: 56px; /* space for bottom ruler */
+  overflow-x: visible; /* 親（ShiftContainer）が幅を持つので横スクロールしない */
+  overflow-y: auto;
+  min-height: 48px;
 }
 
 /* wrapper for each block row */
 .member-block-wrapper {
   width: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
-/* block main */
-.member-block {
-  align-items: stretch;
-}
-
-/* left drag handle inside block */
+/* left drag handle inside each row (placed at x=0) */
 .block-drag-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
   user-select: none;
+  z-index: 3;
   background: transparent;
   border-right: 1px solid #eee;
+}
+.block-drag-handle .drag-symbol {
+  font-size: 14px;
+  color: #666;
   padding-left: 4px;
   padding-right: 4px;
 }
 
-/* block body (horizontal width represents time) */
+/* block body (absolute) */
 .block-body {
+  position: absolute;
+  top: 0;
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-left: none;
   box-sizing: border-box;
-  position: relative;
-  /* overflow: visible; */
-  padding-right: 60px;
+  overflow: visible;
+  z-index: 1;
+  display: flex;
+  align-items: center;
 }
 
-/* controls inside block (absolute at right) */
-.block-controls .op-btn {
+/* controls inside block */
+.block-controls {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+  pointer-events: auto;
+}
+.op-btn {
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 4px;
   background: #f3f3f3;
   border: 1px solid #e6e6e6;
+  cursor: pointer;
 }
 
-/* time ruler: absolute bottom element */
+/* time ruler */
 .time-ruler {
   pointer-events: none;
   bottom: 0;
+  left: 0;
 }
-
-/* ruler inner uses absolute hour marks */
 .ruler-inner {
   position: relative;
-  height: 48px;
+  height: 56px;
   box-sizing: border-box;
   padding-top: 4px;
 }
-
-/* hour mark positioning */
 .hour-mark {
   position: absolute;
   top: 0;
   transform: translateX(-0.5px);
   text-align: center;
-  width: 36px; /* optional visual anchor */
+  width: 36px;
 }
 .hour-mark .h-line {
   background: #cbd5e1;
@@ -367,8 +370,9 @@ onBeforeUnmount(() => {
   color: #4b5563;
 }
 
-/* small responsive tweaks */
-@media (min-width: 640px) {
-  /* nothing special */
-}
+/* ensure controls clickable */
+.block-controls button { pointer-events: auto; }
+
+/* responsive tweaks */
+@media (min-width:640px) {}
 </style>
