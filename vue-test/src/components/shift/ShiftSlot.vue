@@ -112,7 +112,8 @@ const timelineRef = ref(null);
 const selectedBlock = ref(null);
 
 const cssPad = computed(() => props.pad || "0.1vw");
-const dragAreaWidth = computed(() => "1vw");
+// const dragAreaWidth = computed(() => "1vw");
+  const dragAreaWidth = computed(() => "20px");
 
 // compute timeline width px from startHour/endHour
 const timelineWidthPx = computed(() => {
