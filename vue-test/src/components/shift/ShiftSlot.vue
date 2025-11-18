@@ -84,7 +84,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update-slots"]);
-
 const dragManager = useDragManager();
 const store = useShiftStore();
 
@@ -93,10 +92,15 @@ const selectedBlock = ref(null);
 
 const cssPad = computed(() => props.pad || "0.1vw");
 
-/* タイムライン幅（常に固定で100%表示するため、overflow-x:hidden にする） */
+/* ここが定義されていなかったためエラー！ */
+function padHour(h) {
+  return String(h).padStart(2, "0");
+}
+
+/* タイムライン幅（横スクロールしない） */
 const timelineWidthPx = computed(() => {
   const hours = props.endHour - props.startHour;
-  return hours * 60 / 10 * props.unitPer10Min;
+  return hours * 6 * 6; // 1時間36px
 });
 
 const localSlots = ref((props.slots || []).map(s => ({ ...s })));
@@ -108,10 +112,10 @@ const hourArray = computed(() => {
   return arr;
 });
 
-/* 位置計算 */
+/* ブロック位置の style */
 function blockBodyStyle(block) {
   const minutesFromStart = block.start_min - props.startHour * 60;
-  const leftPx = Math.max(0, (minutesFromStart / 10) * props.unitPer10Min);
+  const leftPx = Math.max(0, (minutesFromStart / 10) * props.unitPer10Min + 32);
 
   return {
     position: "absolute",
@@ -121,7 +125,8 @@ function blockBodyStyle(block) {
     top: "0",
     background: "#fff",
     border: "1px solid #e2e8f0",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
+    borderRadius: "4px"
   };
 }
 
@@ -130,6 +135,7 @@ function increase(block) {
   block.duration_min += 10;
   emit("update-slots", localSlots.value);
 }
+
 function decrease(block) {
   block.duration_min = Math.max(10, block.duration_min - 10);
   emit("update-slots", localSlots.value);
@@ -145,7 +151,7 @@ function selectBlock(block) {
   selectedBlock.value = block;
 }
 
-/* ドラッグハンドル */
+/* ドラッグ操作 */
 function onBlockHandleDragStart(block, e) {
   dragManager.startDrag("slotBlock", block, e);
   e.dataTransfer.setData(
@@ -153,11 +159,11 @@ function onBlockHandleDragStart(block, e) {
     JSON.stringify({ dragType: "slotBlock", payload: block })
   );
 }
+
 function onDragEnd() {
   dragManager.clearDrag();
 }
 
-/* ドロップ */
 function onDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
@@ -167,7 +173,7 @@ function onDrop(e) {
   if (!data.dragType) return;
 
   const rect = timelineRef.value.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left - 32; // 左端ツール分を補正
   const tenMinUnits = Math.round(x / props.unitPer10Min);
   const start_min = props.startHour * 60 + tenMinUnits * 10;
 
@@ -195,7 +201,6 @@ watch(
   width: 100%;
 }
 
-/* タイムライン（横スクロール禁止） */
 .timeline {
   position: relative;
   width: 100%;
@@ -203,14 +208,12 @@ watch(
   padding-bottom: 50px;
 }
 
-/* 行全体 */
 .slot-row {
   width: 100%;
   position: relative;
   margin-bottom: 8px;
 }
 
-/* 左端ツール */
 .slot-left-tools {
   width: 32px;
   position: absolute;
@@ -223,7 +226,6 @@ watch(
   justify-content: center;
 }
 
-/* ドラッグハンドル */
 .drag-handle {
   cursor: grab;
   font-size: 18px;
@@ -231,7 +233,6 @@ watch(
   margin-bottom: 4px;
 }
 
-/* 削除ボタン */
 .delete-btn {
   background: #f3f3f3;
   border: 1px solid #ccc;
@@ -241,13 +242,10 @@ watch(
   cursor: pointer;
 }
 
-/* ブロック本体 */
 .block-body {
   position: absolute;
-  left: 32px;
 }
 
-/* +- ボタン右上 */
 .size-buttons {
   position: absolute;
   right: 2px;
@@ -264,7 +262,6 @@ watch(
   border-radius: 3px;
 }
 
-/* 時間メモリ */
 .time-ruler {
   position: absolute;
   bottom: 0;
@@ -276,12 +273,14 @@ watch(
   transform: translateX(-18px);
   text-align: center;
 }
+
 .h-line {
   width: 1px;
   height: 8px;
   background: #777;
   margin: 0 auto;
 }
+
 .h-label {
   font-size: 10px;
   margin-top: 4px;
