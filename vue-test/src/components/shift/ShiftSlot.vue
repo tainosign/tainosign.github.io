@@ -2,7 +2,7 @@
 <template>
   <div class="shift-slot-root" :style="{ padding: cssPad }">
     <!-- optional title -->
-    <div class="slot-title">タイムライン（{{ padHour(startHour) }}:00〜{{ padHour(endHour) }}:00）</div>
+   <!--  <div class="slot-title">タイムライン（{{ padHour(startHour) }}:00〜{{ padHour(endHour) }}:00）</div> -->
 
     <!-- timeline root: 横幅は timelineInnerWidthPx + leftToolWidth -->
     <div class="timeline-root" ref="timelineRef" @dragover.prevent="onDragOver" @drop.prevent="onDrop">
