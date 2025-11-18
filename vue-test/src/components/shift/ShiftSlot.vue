@@ -1,9 +1,11 @@
+<!-- src/components/shift/ShiftSlot.vue -->
 <template>
   <div class="shift-slot-root" :style="{ padding: cssPad }">
 
-    <!-- タイムライン全体（横スクロール禁止、ルート幅100%） -->
+    <!-- タイムライン（横スクロール禁止 & 全体固定幅） -->
     <div
-      class="timeline bg-gray-50 relative w-full"
+      class="timeline bg-gray-50 relative"
+      :style="{ width: timelineWidthPx + 32 + 'px' }"
       ref="timelineRef"
       @dragover.prevent="onDragOver"
       @drop.prevent="onDrop"
@@ -13,7 +15,7 @@
       <div
         v-for="block in localSlots"
         :key="block.id"
-        class="slot-row"
+        class="slot-row flex items-center relative"
       >
 
         <!-- 左ツール（ドラッグ・削除）-->
@@ -32,7 +34,7 @@
 
         <!-- ブロック本体 -->
         <div
-          class="block-body"
+          class="block-body relative"
           :style="blockBodyStyle(block)"
           @mousedown.prevent="selectBlock(block)"
         >
@@ -47,12 +49,9 @@
 
       </div>
 
-      <!-- 時間メモリ -->
-      <div class="time-ruler w-full">
-        <div
-          class="ruler-inner relative"
-          :style="{ width: timelineWidthPx + 'px' }"
-        >
+      <!-- 時間メモリ（下固定） -->
+      <div class="time-ruler">
+        <div class="ruler-inner" :style="{ width: timelineWidthPx + 'px' }">
           <div
             v-for="h in hourArray"
             :key="h"
@@ -78,7 +77,7 @@ const props = defineProps({
   slots: Array,
   startHour: { type: Number, default: 7 },
   endHour: { type: Number, default: 20 },
-  unitPer10Min: { type: Number, default: 6 }, // 10分6px → 1時間36px
+  unitPer10Min: { type: Number, default: 6 }, // 10分=6px → 1時間36px
   pad: { type: String, default: "0.1vw" },
 });
 
@@ -86,7 +85,6 @@ const emit = defineEmits(["update-slots"]);
 const dragManager = useDragManager();
 
 const timelineRef = ref(null);
-const selectedBlock = ref(null);
 
 const cssPad = computed(() => props.pad || "0.1vw");
 
@@ -96,30 +94,28 @@ function padHour(h) {
 
 const localSlots = ref((props.slots || []).map(s => ({ ...s })));
 
-/* 時間メモリ用 */
+/* 時間メモリ */
 const hourArray = computed(() => {
   const result = [];
   for (let h = props.startHour; h <= props.endHour; h++) result.push(h);
   return result;
 });
 
-/* タイムライン内部の幅（12時間=432px） */
+/* タイムラインの幅（固定） */
 const timelineWidthPx = computed(() => {
-  return (props.endHour - props.startHour) * 36; // 1h=36px
+  return (props.endHour - props.startHour) * 36;
 });
 
 /* ブロックの位置と幅 */
 function blockBodyStyle(block) {
   const start = block.start_min - props.startHour * 60;
-  const leftPx = (start / 10) * props.unitPer10Min + 32;
+  const leftPx = (start / 10) * props.unitPer10Min;
 
   const widthPx = (block.duration_min / 10) * props.unitPer10Min;
 
   return {
-    position: "absolute",
     left: leftPx + "px",
     width: widthPx + "px",
-    height: "100%",
     background: "#fff",
     border: "1px solid #bbb",
     borderRadius: "4px",
@@ -144,11 +140,7 @@ function removeBlock(id) {
   emit("update-slots", localSlots.value);
 }
 
-function selectBlock(block) {
-  selectedBlock.value = block;
-}
-
-/* ドラッグ関連 */
+/* ドラッグ */
 function onBlockHandleDragStart(block, e) {
   dragManager.startDrag("slotBlock", block, e);
   e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "slotBlock", payload: block }));
@@ -164,14 +156,13 @@ function onDrop(e) {
   if (!data.dragType) return;
 
   const rect = timelineRef.value.getBoundingClientRect();
-  const x = e.clientX - rect.left - 32; // 左ツール分
+  const x = e.clientX - rect.left;
 
   const tenMinUnit = Math.round(x / props.unitPer10Min);
   const newStart = props.startHour * 60 + tenMinUnit * 10;
 
   if (data.dragType === "slotBlock") {
-    const block = data.payload;
-    const t = localSlots.value.find(b => b.id === block.id);
+    const t = localSlots.value.find(b => b.id === data.payload.id);
     if (t) {
       t.start_min = newStart;
       emit("update-slots", localSlots.value);
@@ -179,6 +170,7 @@ function onDrop(e) {
   }
 }
 
+/* props の変化を反映 */
 watch(
   () => props.slots,
   v => (localSlots.value = (v || []).map(s => ({ ...s }))),
@@ -189,41 +181,40 @@ watch(
 <style scoped>
 .shift-slot-root {
   width: 100%;
-  position: relative;
 }
 
+/* タイムライン */
 .timeline {
-  width: 100%;
-  overflow-x: hidden; /* 横スクロール禁止 */
-  position: relative;
-  padding-bottom: 50px;
+  overflow-x: hidden;
+  padding-bottom: 40px;
 }
 
+/* 行 */
 .slot-row {
-  width: 100%;
-  position: relative;
-  padding-left: 32px; /* 左ツール領域 */
-  margin-bottom: 8px;
-  min-height: 32px;
+  min-height: 40px;
+  margin-bottom: 6px;
+  padding-left: 32px;
 }
 
+/* 左端ツール */
 .slot-left-tools {
   width: 32px;
   position: absolute;
   left: 0;
   top: 0;
-  z-index: 50;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 4px;
 }
 
 .drag-handle {
   cursor: grab;
   font-size: 18px;
   color: #444;
-  margin-bottom: 4px;
+}
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .delete-btn {
@@ -235,9 +226,10 @@ watch(
   cursor: pointer;
 }
 
+/* ブロック */
 .block-body {
-  position: absolute;
-  top: 0;
+  position: relative;
+  height: 40px;
 }
 
 .label {
@@ -263,6 +255,7 @@ watch(
   cursor: pointer;
 }
 
+/* 時間メモリ */
 .time-ruler {
   position: absolute;
   left: 32px;
