@@ -27,8 +27,8 @@ jobs:
 #          npm ci
 #          npm run build
 
-#      - name: 📂 distフォルダを確認
-#        run: ls -R dist
+      - name: 📂 distフォルダを確認
+        run: ls -R dist
 
       - name: 🔥 Firebase Hostingへデプロイ
         uses: FirebaseExtended/action-hosting-deploy@v0
