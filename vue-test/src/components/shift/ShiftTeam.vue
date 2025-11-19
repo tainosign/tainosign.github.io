@@ -1,7 +1,7 @@
 <template>
   <ShiftContainer
     :item="team"
-    :list="[ { date: shiftDate } ]"
+    :list="[ team ]"
     type="team"
     :timelineWidthPx="timelineWidthPx"
   >
