@@ -62,6 +62,11 @@ export const useShiftStore = defineStore("shiftStore", () => {
   // -------------------
   // チーム / ポジション / スロット 操作
   // -------------------
+
+const removeShift = (date) => {
+  shifts.value = shifts.value.filter(s => s.date !== date);
+};
+  
   const addTeam = (date) => {
     const shift = shifts.value.find((s) => s.date === date);
     if (!shift) return;
@@ -111,6 +116,7 @@ export const useShiftStore = defineStore("shiftStore", () => {
       slots: [],
     });
   };
+  
 
   const removePosition = (date, teamId, positionId) => {
     const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
@@ -128,25 +134,28 @@ export const useShiftStore = defineStore("shiftStore", () => {
     team.positions.push(newPos);
   };
 
-  const addSlot = (date, teamId, positionId) => {
-    const pos = shifts.value.find((s) => s.date === date)
-      ?.teams.find((t) => t.id === teamId)
-      ?.positions.find((p) => p.positionId === positionId);
-    if (!pos) return;
-    pos.slots.push({
-      slotId: `slot_${Date.now()}`,
-      name: `スロット ${pos.slots.length + 1}`,
-      members: [],
-    });
-  };
+// addSlot を slot オブジェクト（slotId + blocks）を push する実装に（互換性確保）
+const addSlot = (date, teamId, positionId) => {
+  const pos = shifts.value.find((s) => s.date === date)
+    ?.teams.find((t) => t.id === teamId)
+    ?.positions.find((p) => p.positionId === positionId);
+  if (!pos) return;
+  pos.slots.push({
+    slotId: `slot_${Date.now()}`,
+    name: `スロット ${pos.slots.length + 1}`,
+    blocks: [], // 個々の block 配列をここに保存する
+    members: [], // 旧互換のため残すが新コードは blocks を使います
+  });
+};
 
-  const removeSlot = (date, teamId, positionId, slotId) => {
-    const pos = shifts.value.find((s) => s.date === date)
-      ?.teams.find((t) => t.id === teamId)
-      ?.positions.find((p) => p.positionId === positionId);
-    if (!pos) return;
-    pos.slots = pos.slots.filter((s) => s.slotId !== slotId);
-  };
+// removeSlot (date, teamId, positionId, slotId)
+const removeSlot = (date, teamId, positionId, slotId) => {
+  const pos = shifts.value.find((s) => s.date === date)
+    ?.teams.find((t) => t.id === teamId)
+    ?.positions.find((p) => p.positionId === positionId);
+  if (!pos) return;
+  pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
+};
 
   // -------------------
   // assignMemberToSlot（ドラッグで配置されたメンバーを保存）
@@ -193,6 +202,7 @@ export const useShiftStore = defineStore("shiftStore", () => {
     getShiftsByDates,
     saveShiftsByDates,
 
+    removeShift,
     addTeam,
     removeTeam,
     duplicateTeam,
