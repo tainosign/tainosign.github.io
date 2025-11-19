@@ -69,7 +69,7 @@ import { useShiftStore } from "@/stores/shiftStore";
 
 const props = defineProps({
   slotId: { type: String, required: false }, // parent should pass real slotId
-  slots: { type: Array, default: () => [] }, // blocks array for this slot
+  blocks: { type: Array, default: () => [] }, // blocks array for this slot
   startHour: { type: Number, default: 7 },
   endHour: { type: Number, default: 20 },
   unitPer10Min: { type: Number, default: 6 },
@@ -99,7 +99,8 @@ const timelineInnerWidth = computed(() => {
 
 // local copy of blocks (so editing doesn't mutate parent array until syncUp)
 const localSlots = ref((props.slots || []).map(s => ({ ...s })));
-
+const localBlocks = ref(JSON.parse(JSON.stringify(props.blocks)));
+  
 const hourArray = computed(() => {
   const arr = [];
   for (let h = props.startHour; h <= props.endHour; h++) arr.push(h);
