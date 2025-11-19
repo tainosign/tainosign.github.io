@@ -27,6 +27,7 @@
           :endHour="endHour"
           :timelineWidthPx="timelineWidthPx"
           @update-slots="onSlotsUpdate"
+          @remove-slot="onRemoveSlot"
         />
       </div>
     </template>
@@ -57,6 +58,17 @@ positionName.value = props.position.name || "";
 
 function addSlot() {
   store.addSlot(props.shiftDate, props.teamId, props.position.positionId);
+  emit("update-position");
+}
+
+  function onRemoveSlot(slotId) {
+  const shift = store.shifts.find((s) => s.date === props.shiftDate);
+  if (!shift) return;
+  const team = shift.teams.find((t) => t.id === props.teamId);
+  if (!team) return;
+  const pos = team.positions.find((p) => p.positionId === props.position.positionId);
+  if (!pos) return;
+  pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
   emit("update-position");
 }
 
