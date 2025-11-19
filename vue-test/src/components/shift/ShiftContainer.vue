@@ -92,7 +92,7 @@ const containerStyle = computed(() => {
     padding: "0",
     margin: "0",
     flex: "0 0 auto",
-    display: "inline-block",
+    display: "block",
   };
 
   if (props.timelineWidthPx) {
