@@ -1,8 +1,8 @@
-<!-- src/components/shift/ShiftContainer.vue -->
 <template>
   <div
     :class="[
       'shift-container flex flex-col bg-transparent transition-all duration-200',
+      extraBoxClass,
       item.locked ? 'opacity-70' : ''
     ]"
     :style="containerStyle"
@@ -26,7 +26,7 @@
             {{ item.folded ? '＋' : '－' }}
           </button>
 
-          <!-- 削除は type に依り処理 -->
+          <!-- 削除は type によって扱いを分ける -->
           <button v-if="!item.locked" @click.stop="onRemove" class="btn-op btn-remove" title="削除">✖</button>
 
           <button @click.stop="onDuplicate" class="btn-op" title="複製">📄</button>
@@ -43,7 +43,7 @@
 
       <div class="header-main">
         <slot name="header">
-          <div class="title-text truncate">{{ item.name }}</div>
+          <div class="title-text truncate">{{ item.name || item.date || '（無題）' }}</div>
         </slot>
       </div>
     </div>
@@ -76,10 +76,18 @@ const { toggleLock, toggleFold, duplicate, remove } = useShiftItem(props.item);
 
 // css helpers
 const cssPad = computed(() => props.pad || "0.1vw");
-// 固定ハンドル幅（px）
+// fixed handle width
 const handlePx = 32;
 
-// container width: timelineWidthPx があるときはそれに合わせる（ハンドル領域を含める）
+// box class for visual separation (date/team/position)
+const extraBoxClass = computed(() => {
+  if (props.type === "shift") return "box-shift";
+  if (props.type === "team") return "box-team";
+  if (props.type === "position") return "box-position";
+  return "";
+});
+
+// container style: if timelineWidthPx provided, set width accordingly (include handle)
 const containerStyle = computed(() => {
   const base = {
     boxSizing: "border-box",
@@ -96,16 +104,17 @@ const containerStyle = computed(() => {
   return { ...base, width: "auto", minWidth: "120px" };
 });
 
-// onDuplicate/onRemove は type によって store の該当関数を呼ぶ
+// onDuplicate/onRemove with explicit handling of shift/team/position
 const onDuplicate = () => {
   if (props.type === "team") store.duplicateTeam(props.list[0]?.date, props.item.id);
   else if (props.type === "position") store.duplicatePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
   else if (props.type === "shift") {
-    // shift の複製（簡易）： store に複製処理が無ければ単純に createNewShift を使う
+    // simple duplicate by creating new shift with same date + suffix
     if (props.item?.date) {
-      store.createNewShift([props.item.date + "-copy-" + Date.now()]);
+      store.createNewShift([`${props.item.date}-copy-${Date.now()}`]);
     }
   } else {
+    // fallback: use composable duplicate if parent list contains real object reference
     duplicate(props.list);
   }
 };
@@ -114,10 +123,9 @@ const onRemove = () => {
   if (props.type === "team") store.removeTeam(props.list[0]?.date, props.item.id);
   else if (props.type === "position") store.removePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
   else if (props.type === "shift") {
-    // shift 削除：store 側に removeShift(date) を追加している想定
     if (props.item?.date) store.removeShift(props.item.date);
   } else {
-    // fallback: try to remove from provided list
+    // fallback: try composable remove (works when list contains real object reference)
     remove(props.list);
   }
 };
@@ -139,19 +147,15 @@ const onDragEnd = () => {
 <style scoped>
 :root { --pad: 0.1vw; --mar: 0.1vw; }
 
-.shift-container {
-  margin: var(--mar);
-  box-sizing: border-box;
-  border-radius: 6px;
-  border: 1px solid transparent;
-}
+/* base */
+.shift-container { margin: var(--mar); box-sizing: border-box; border-radius: 6px; }
 
-/* 日付やチームごとの視認性のため、親側で枠線を付けたい場合はここで上書きできます */
-.header-row {
-  display: flex;
-  gap: 0.4vw;
-  align-items: flex-start;
-}
+/* distinct box styles for visual separation */
+.box-shift { border: 1px solid #dbeafe; padding: 6px; background: #fbfdff; }
+.box-team { border: 1px dashed #e6f4ea; padding: 6px; background: #fcfffb; }
+.box-position { border: 1px dotted #fff7ed; padding: 6px; background: #fffdfa; }
+
+.header-row { display: flex; gap: 0.4vw; align-items: flex-start; }
 
 .drag-area { height: 36px; display:flex; align-items:center; justify-content:center; cursor:grab; user-select:none; }
 .drag-symbol { font-size:16px; color:#666; }
@@ -170,6 +174,7 @@ const onDragEnd = () => {
 
 .truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* transition */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
 .fade-enter-from, .fade-leave-to { opacity:0; }
 </style>
