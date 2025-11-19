@@ -22,7 +22,7 @@
           :shift-date="shiftDate"
           :team-id="teamId"
           :position-id="position.positionId"
-          :slots="slot.blocks || slot.blocks /* legacy */ || slot.members /* legacy */ || slot.slotBlocks || slot.members || []"
+          :slots="slot.blocks"
           :unitPer10Min="unitPer10Min"
           :startHour="startHour"
           :endHour="endHour"
