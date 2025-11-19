@@ -60,23 +60,39 @@ function addSlot() {
   emit("update-position");
 }
 
-function onSlotsUpdate(newSlots) {
-  // store側に反映（簡易）
+// 変更前:
+// function onSlotsUpdate(newSlots) { ... }
+
+// 変更後:
+function onSlotsUpdate(payload) {
+  // payload = { slotId, blocks }
+  if (!payload || !payload.slotId) {
+    // 互換で古い配列が来る場合は無視しないで置換（ただし推奨はしない）
+    return;
+  }
   const shift = store.shifts.find((s) => s.date === props.shiftDate);
   if (!shift) return;
   const team = shift.teams.find((t) => t.id === props.teamId);
   if (!team) return;
   const pos = team.positions.find((p) => p.positionId === props.position.positionId);
   if (!pos) return;
-  // map to pos.slots's internal representation
-  pos.slots = (newSlots || []).map((b, idx) => {
-    return {
-      slotId: b.id || `slot_${idx}_${Date.now()}`,
-      blocks: [b], // keep as blocks array for each slot - simple model
-    };
-  });
+
+  // find corresponding slot object by slotId
+  const slotIdx = pos.slots.findIndex(s => (s.slotId === payload.slotId || s.id === payload.slotId));
+  if (slotIdx !== -1) {
+    // replace only blocks for that slot
+    pos.slots[slotIdx].blocks = (payload.blocks || []).map(b => ({ ...b }));
+  } else {
+    // if not found, optionally add a new slot entry with given slotId
+    pos.slots.push({
+      slotId: payload.slotId,
+      blocks: (payload.blocks || []).map(b => ({ ...b })),
+    });
+  }
+
   emit("update-position");
 }
+
 </script>
 
 <style scoped>
