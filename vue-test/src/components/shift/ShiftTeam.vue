@@ -1,7 +1,7 @@
 <template>
   <ShiftContainer
     :item="team"
-    :list="[ team ]"
+    :list="shiftRef.teams"
     type="team"
     :timelineWidthPx="timelineWidthPx"
   >
