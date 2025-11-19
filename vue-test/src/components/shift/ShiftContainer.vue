@@ -2,7 +2,7 @@
   <div
     :class="[
       'shift-container flex flex-col bg-transparent transition-all duration-200',
-      extraBoxClass,
+      typeClass,
       item.locked ? 'opacity-70' : ''
     ]"
     :style="containerStyle"
@@ -26,7 +26,7 @@
             {{ item.folded ? '＋' : '－' }}
           </button>
 
-          <!-- 削除は type によって扱いを分ける -->
+          <!-- 削除は type によって store の処理を呼ぶ -->
           <button v-if="!item.locked" @click.stop="onRemove" class="btn-op btn-remove" title="削除">✖</button>
 
           <button @click.stop="onDuplicate" class="btn-op" title="複製">📄</button>
@@ -43,7 +43,7 @@
 
       <div class="header-main">
         <slot name="header">
-          <div class="title-text truncate">{{ item.name || item.date || '（無題）' }}</div>
+          <div class="title-text truncate">{{ item.name }}</div>
         </slot>
       </div>
     </div>
@@ -64,7 +64,8 @@ import { useDragManager } from "@/composables/useDragManager";
 
 const props = defineProps({
   item: { type: Object, required: true },
-  list: { type: Array, default: () => [] },
+  // IMPORTANT: list must be the actual array that contains `item` (e.g. store.shifts or shift.teams etc.)
+  list: { type: Array, required: true },
   type: { type: String, default: "generic" },
   timelineWidthPx: { type: Number, default: null },
   pad: { type: String, default: "0.1vw" },
@@ -76,18 +77,15 @@ const { toggleLock, toggleFold, duplicate, remove } = useShiftItem(props.item);
 
 // css helpers
 const cssPad = computed(() => props.pad || "0.1vw");
-// fixed handle width
+// 固定ハンドル幅（px）
 const handlePx = 32;
 
-// box class for visual separation (date/team/position)
-const extraBoxClass = computed(() => {
-  if (props.type === "shift") return "box-shift";
-  if (props.type === "team") return "box-team";
-  if (props.type === "position") return "box-position";
-  return "";
+// type class for visual borders
+const typeClass = computed(() => {
+  return props.type ? `shift-type-${props.type}` : "";
 });
 
-// container style: if timelineWidthPx provided, set width accordingly (include handle)
+// container width: timelineWidthPx があるときはそれに合わせる（ハンドル領域を含める）
 const containerStyle = computed(() => {
   const base = {
     boxSizing: "border-box",
@@ -101,38 +99,38 @@ const containerStyle = computed(() => {
     const totalPx = props.timelineWidthPx + handlePx + 12;
     return { ...base, width: `${totalPx}px` };
   }
-  return { ...base, width: "auto", minWidth: "120px" };
+  return { ...base, width: "100%" };
 });
 
-// onDuplicate/onRemove with explicit handling of shift/team/position
+// onDuplicate/onRemove は type によって store の該当関数を呼ぶ
 const onDuplicate = () => {
-  if (props.type === "team") store.duplicateTeam(props.list[0]?.date, props.item.id);
-  else if (props.type === "position") store.duplicatePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
+  if (props.type === "team") store.duplicateTeam(props.listContext?.date ?? props.list[0]?.date, props.item.id);
+  else if (props.type === "position") store.duplicatePosition(props.listContext?.date ?? props.list[0]?.date, props.listContext?.teamId ?? props.list[0]?.teamId, props.item.positionId);
   else if (props.type === "shift") {
-    // simple duplicate by creating new shift with same date + suffix
+    // shift duplication: create new shift in store with same structure (simple)
     if (props.item?.date) {
-      store.createNewShift([`${props.item.date}-copy-${Date.now()}`]);
+      store.createNewShift([props.item.date + "-copy-" + Date.now()]);
     }
   } else {
-    // fallback: use composable duplicate if parent list contains real object reference
     duplicate(props.list);
   }
 };
 
+// onRemove: call appropriate store removal
 const onRemove = () => {
-  if (props.type === "team") store.removeTeam(props.list[0]?.date, props.item.id);
-  else if (props.type === "position") store.removePosition(props.list[0]?.date, props.list[0]?.teamId, props.item.positionId);
+  if (props.type === "team") store.removeTeam(props.listContext?.date ?? props.list[0]?.date, props.item.id);
+  else if (props.type === "position") store.removePosition(props.listContext?.date ?? props.list[0]?.date, props.listContext?.teamId ?? props.list[0]?.teamId, props.item.positionId);
   else if (props.type === "shift") {
     if (props.item?.date) store.removeShift(props.item.date);
   } else {
-    // fallback: try composable remove (works when list contains real object reference)
+    // fallback: use remove() which modifies the provided list reference (this requires list to be correct)
     remove(props.list);
   }
 };
 
 // drag handle
 const onHandleDragStart = (e) => {
-  const payload = { type: props.type, item: props.item, sourceDate: props.list[0]?.date };
+  const payload = { type: props.type, item: props.item, sourceDate: props.listContext?.date ?? props.list[0]?.date };
   if (e?.dataTransfer) {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify({ dragType: "shiftItem", payload }));
@@ -147,19 +145,27 @@ const onDragEnd = () => {
 <style scoped>
 :root { --pad: 0.1vw; --mar: 0.1vw; }
 
-/* base */
-.shift-container { margin: var(--mar); box-sizing: border-box; border-radius: 6px; }
+.shift-container {
+  margin: var(--mar);
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: white;
+}
 
-/* distinct box styles for visual separation */
-.box-shift { border: 1px solid #dbeafe; padding: 6px; background: #fbfdff; }
-.box-team { border: 1px dashed #e6f4ea; padding: 6px; background: #fcfffb; }
-.box-position { border: 1px dotted #fff7ed; padding: 6px; background: #fffdfa; }
+/* visual borders per type */
+.shift-type-shift { border: 1px dashed rgba(34, 197, 94, 0.25); padding: 6px; }
+.shift-type-team { border: 1px dashed rgba(59, 130, 246, 0.14); padding: 4px; }
+.shift-type-position { border: 1px dashed rgba(234, 88, 12, 0.08); padding: 2px; }
 
+/* header row */
 .header-row { display: flex; gap: 0.4vw; align-items: flex-start; }
 
+/* drag */
 .drag-area { height: 36px; display:flex; align-items:center; justify-content:center; cursor:grab; user-select:none; }
-.drag-symbol { font-size:16px; color:#666; }
+.drag-symbol { font-size: 16px; color: #666; }
 
+/* actions */
 .header-actions { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; }
 .action-row { display:flex; gap:6px; align-items:center; }
 
@@ -167,14 +173,17 @@ const onDragEnd = () => {
 .btn-op.locked { background:#444; color:white; }
 .btn-op.btn-remove { background:#fff4f4; border-color:#f5c6cb; color:#c53030; }
 
+/* header main */
 .header-main { flex:1 1 auto; min-width:0; }
 .title-text { font-weight:600; font-size:0.95rem; }
 
+/* content */
 .content-area { margin-top:6px; }
 
+/* truncate */
 .truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* transition */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
-.fade-enter-from, .fade-leave-to { opacity:0; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
