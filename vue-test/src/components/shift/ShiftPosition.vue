@@ -1,7 +1,7 @@
 <template>
   <ShiftContainer
     :item="position"
-    :list="[ { date: shiftDate, teamId: teamId } ]"
+    :list="[ position ]"
     type="position"
     :timelineWidthPx="timelineWidthPx"
   >
@@ -18,6 +18,7 @@
         <ShiftSlot
           v-for="slot in position.slots"
           :key="slot.slotId || slot.id"
+          :slot-id="slot.slotId || slot.id"
           :shift-date="shiftDate"
           :team-id="teamId"
           :position-id="position.positionId"
