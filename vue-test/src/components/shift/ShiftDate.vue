@@ -2,7 +2,7 @@
   <div class="p-2" :style="{ padding: cssPad }">
     <ShiftContainer
       :item="shift"
-      :list="[ { date: shift.date } ]"
+      :list="[ shift ]"
       type="shift"
       :timelineWidthPx="timelineWidthPx"
     >
