@@ -1,7 +1,8 @@
+<!-- src/components/shift/ShiftTeam.vue -->
 <template>
   <ShiftContainer
     :item="team"
-    :list="shiftRef.teams"
+    :list="[team]"
     type="team"
     :timelineWidthPx="timelineWidthPx"
   >
@@ -15,7 +16,6 @@
     </template>
 
     <template #body>
-      <!-- ポジションを縦に積む -->
       <div class="flex flex-col gap-2">
         <ShiftPosition
           v-for="position in team.positions"
