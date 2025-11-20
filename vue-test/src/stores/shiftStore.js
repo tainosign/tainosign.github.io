@@ -27,14 +27,44 @@ export const useShiftStore = defineStore("shiftStore", () => {
     activeDay.value = date;
   };
 
+  // createNewShift: create shift and also create one team / one position / one slot by default
   const createNewShift = (dates) => {
     for (const date of dates) {
       if (!shifts.value.some((s) => s.date === date)) {
-        shifts.value.push({
+        const newShift = {
           id: `${date}-${Date.now()}`,
           date,
-          teams: [],
-        });
+          teams: []
+        };
+        // default create one team -> one position -> one slot
+        const teamId = `team_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+        const positionId = `pos_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+        const slotId = `slot_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+
+        const slotObj = {
+          slotId,
+          name: `スロット 1`,
+          blocks: [], // canonical storage for blocks in a slot
+        };
+
+        const positionObj = {
+          positionId,
+          name: `新しいポジション 1`,
+          folded: false,
+          locked: false,
+          slots: [slotObj],
+        };
+
+        const teamObj = {
+          id: teamId,
+          name: `新しいチーム 1`,
+          folded: false,
+          locked: false,
+          positions: [positionObj],
+        };
+
+        newShift.teams.push(teamObj);
+        shifts.value.push(newShift);
       }
     }
   };
@@ -62,20 +92,24 @@ export const useShiftStore = defineStore("shiftStore", () => {
   // -------------------
   // チーム / ポジション / スロット 操作
   // -------------------
+  const removeShift = (date) => {
+    shifts.value = shifts.value.filter(s => s.date !== date);
+  };
 
-const removeShift = (date) => {
-  shifts.value = shifts.value.filter(s => s.date !== date);
-};
-  
   const addTeam = (date) => {
     const shift = shifts.value.find((s) => s.date === date);
     if (!shift) return;
+    const teamId = `team_${Date.now()}`;
+    const positionId = `pos_${Date.now()}`;
+    const slotId = `slot_${Date.now()}`;
+    const slotObj = { slotId, name: `スロット 1`, blocks: [] };
+    const positionObj = { positionId, name: `新しいポジション ${shift.teams.reduce((a,t)=>a+t.positions.length,0)+1}`, folded:false, locked:false, slots:[slotObj] };
     shift.teams.push({
-      id: `team_${Date.now()}`,
+      id: teamId,
       name: `新しいチーム ${shift.teams.length + 1}`,
       folded: false,
       locked: false,
-      positions: [],
+      positions: [positionObj],
     });
   };
 
@@ -108,15 +142,17 @@ const removeShift = (date) => {
   const addPosition = (date, teamId) => {
     const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
     if (!team) return;
+    const positionId = `pos_${Date.now()}`;
+    const slotId = `slot_${Date.now()}`;
+    const slotObj = { slotId, name: `スロット 1`, blocks: [] };
     team.positions.push({
-      positionId: `pos_${Date.now()}`,
+      positionId,
       name: `新しいポジション ${team.positions.length + 1}`,
       folded: false,
       locked: false,
-      slots: [],
+      slots: [slotObj],
     });
   };
-  
 
   const removePosition = (date, teamId, positionId) => {
     const team = shifts.value.find((s) => s.date === date)?.teams.find((t) => t.id === teamId);
@@ -134,32 +170,28 @@ const removeShift = (date) => {
     team.positions.push(newPos);
   };
 
-// addSlot を slot オブジェクト（slotId + blocks）を push する実装に（互換性確保）
-const addSlot = (date, teamId, positionId) => {
-  const pos = shifts.value.find((s) => s.date === date)
-    ?.teams.find((t) => t.id === teamId)
-    ?.positions.find((p) => p.positionId === positionId);
-  if (!pos) return;
-  pos.slots.push({
-    slotId: `slot_${Date.now()}`,
-    name: `スロット ${pos.slots.length + 1}`,
-    blocks: [], // 個々の block 配列をここに保存する
-    members: [], // 旧互換のため残すが新コードは blocks を使います
-  });
-};
+  // addSlot: pushes canonical slot object { slotId, name, blocks: [] }
+  const addSlot = (date, teamId, positionId) => {
+    const pos = shifts.value.find((s) => s.date === date)
+      ?.teams.find((t) => t.id === teamId)
+      ?.positions.find((p) => p.positionId === positionId);
+    if (!pos) return;
+    pos.slots.push({
+      slotId: `slot_${Date.now()}`,
+      name: `スロット ${pos.slots.length + 1}`,
+      blocks: [],
+    });
+  };
 
-// removeSlot (date, teamId, positionId, slotId)
-const removeSlot = (date, teamId, positionId, slotId) => {
-  const pos = shifts.value.find((s) => s.date === date)
-    ?.teams.find((t) => t.id === teamId)
-    ?.positions.find((p) => p.positionId === positionId);
-  if (!pos) return;
-  pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
-};
+  const removeSlot = (date, teamId, positionId, slotId) => {
+    const pos = shifts.value.find((s) => s.date === date)
+      ?.teams.find((t) => t.id === teamId)
+      ?.positions.find((p) => p.positionId === positionId);
+    if (!pos) return;
+    pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
+  };
 
-  // -------------------
   // assignMemberToSlot（ドラッグで配置されたメンバーを保存）
-  // -------------------
   const assignMemberToSlot = (date, teamId, positionId, blockData) => {
     const shift = shifts.value.find((s) => s.date === date);
     if (!shift) {
@@ -181,6 +213,23 @@ const removeSlot = (date, teamId, positionId, slotId) => {
 
     if (!Array.isArray(pos.slots)) pos.slots = [];
 
+    // if blockData includes slotId, try to find that slot and push into its blocks array
+    if (blockData.slotId) {
+      const targetSlot = pos.slots.find(s => (s.slotId || s.id) === blockData.slotId);
+      if (targetSlot) {
+        if (!Array.isArray(targetSlot.blocks)) targetSlot.blocks = [];
+        targetSlot.blocks.push({
+          id: blockData.id || `blk_${Date.now()}`,
+          memberId: blockData.memberId,
+          memberName: blockData.memberName,
+          start_min: blockData.start_min,
+          duration_min: blockData.duration_min,
+        });
+        return;
+      }
+    }
+
+    // otherwise push a new slot-style object (backwards compatibility)
     pos.slots.push({
       slotId: blockData.id || `slot_${Date.now()}`,
       memberId: blockData.memberId,
