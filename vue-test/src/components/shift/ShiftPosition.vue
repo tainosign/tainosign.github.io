@@ -15,22 +15,21 @@
 
     <template #body>
       <div class="flex flex-col gap-2">
-        <ShiftSlot
-          v-for="slot in position.slots"
-          :key="slot.slotId"
-        :slot-id="slot.slotId"
-        :blocks="slot.blocks"
-          :shift-date="shiftDate"          
-          :team-id="teamId"
-          :position-id="position.positionId"
-          :blocks="slot.blocks || slot.members || []"
-          :unitPer10Min="unitPer10Min"
-          :startHour="startHour"
-          :endHour="endHour"
-          :timelineWidthPx="timelineWidthPx"
-          @update-slots="onSlotsUpdate"
-          @remove-slot="onRemoveSlot"
-        />
+      <ShiftSlot
+  v-for="slot in position.slots"
+  :key="slot.slotId"
+  :slot-id="slot.slotId"
+  :blocks="slot.blocks"                     <!-- 属性名を "blocks" に統一 -->
+  :shift-date="shiftDate"
+  :team-id="teamId"
+  :position-id="position.positionId"
+  :unitPer10Min="unitPer10Min"
+  :startHour="startHour"
+  :endHour="endHour"
+  :timelineWidthPx="timelineWidthPx"
+  @update-slots="onSlotsUpdate"
+  @remove-slot="onRemoveSlot"
+/>
       </div>
     </template>
   </ShiftContainer>
