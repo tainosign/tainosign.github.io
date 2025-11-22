@@ -27,47 +27,44 @@ export const useShiftStore = defineStore("shiftStore", () => {
     activeDay.value = date;
   };
 
-  // createNewShift: create shift and also create one team / one position / one slot by default
-  const createNewShift = (dates) => {
-    for (const date of dates) {
-      if (!shifts.value.some((s) => s.date === date)) {
-        const newShift = {
-          id: `${date}-${Date.now()}`,
-          date,
-          teams: []
-        };
-        // default create one team -> one position -> one slot
-        const teamId = `team_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-        const positionId = `pos_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-        const slotId = `slot_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+// src/stores/shiftStore.js (部分修正案)
+const createNewShift = (dates) => {
+  for (const date of dates) {
+    if (!shifts.value.some((s) => s.date === date)) {
+      const newShift = {
+        id: `${date}-${Date.now()}`,
+        date,
+        teams: [],
+      };
 
-        const slotObj = {
-          slotId,
-          name: `スロット 1`,
-          blocks: [], // canonical storage for blocks in a slot
-        };
+      // 最初のチーム + ポジション + スロットを作る
+      const team = {
+        id: `team_${Date.now()}`,
+        name: `チーム 1`,
+        folded: false,
+        locked: false,
+        positions: [],
+      };
+      const position = {
+        positionId: `pos_${Date.now()}`,
+        name: `ポジション 1`,
+        folded: false,
+        locked: false,
+        slots: [],
+      };
+      const slot = {
+        slotId: `slot_${Date.now()}`,
+        blocks: [],
+        members: [],
+      };
+      position.slots.push(slot);
+      team.positions.push(position);
+      newShift.teams.push(team);
 
-        const positionObj = {
-          positionId,
-          name: `新しいポジション 1`,
-          folded: false,
-          locked: false,
-          slots: [slotObj],
-        };
-
-        const teamObj = {
-          id: teamId,
-          name: `新しいチーム 1`,
-          folded: false,
-          locked: false,
-          positions: [positionObj],
-        };
-
-        newShift.teams.push(teamObj);
-        shifts.value.push(newShift);
-      }
+      shifts.value.push(newShift);
     }
-  };
+  }
+};
 
   const getShiftsByDates = async (dates) => {
     const { getShiftByDate } = await useFirestoreShifts();
