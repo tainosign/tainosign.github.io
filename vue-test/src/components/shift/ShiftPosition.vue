@@ -19,7 +19,7 @@
   v-for="slot in position.slots"
   :key="slot.slotId"
   :slot-id="slot.slotId"
-  :blocks="slot.blocks"                     <!-- 属性名を "blocks" に統一 -->
+  :blocks="slot.blocks"
   :shift-date="shiftDate"
   :team-id="teamId"
   :position-id="position.positionId"
