@@ -173,8 +173,16 @@ loadedShifts.value = store.shifts;
 </script>
 
 <style scoped>
-.shift-wrapper { display:flex; gap:12px; }
-.shift-column { min-width: 320px; }
+/* ShiftCreateView.vue の style セクション、またはグローバル CSS に追加 */
+.shift-wrapper {
+  display: flex;
+  gap: 16px; /* 日付間の間隔を確保 */
+  align-items: flex-start;
+}
+.shift-column {
+  flex: 0 0 auto;
+  margin-right: 16px; /* 右余白も明示 */
+}
 .btn { padding: 6px 8px; border-radius: 6px; border: none; cursor: pointer; }
 .btn-gray { background:#666; color:#fff; }
 .btn-blue { background:#007bff; color:#fff; }
