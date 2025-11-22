@@ -180,13 +180,15 @@ const createNewShift = (dates) => {
     });
   };
 
-  const removeSlot = (date, teamId, positionId, slotId) => {
-    const pos = shifts.value.find((s) => s.date === date)
-      ?.teams.find((t) => t.id === teamId)
-      ?.positions.find((p) => p.positionId === positionId);
-    if (!pos) return;
-    pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
-  };
+const removeSlot = (date, teamId, positionId, slotId) => {
+  const shift = shifts.value.find(s => s.date === date);
+  if (!shift) return;
+  const team = shift.teams.find(t => t.id === teamId);
+  if (!team) return;
+  const pos = team.positions.find(p => p.positionId === positionId);
+  if (!pos) return;
+  pos.slots = pos.slots.filter(s => s.slotId !== slotId);
+};
 
   // assignMemberToSlot（ドラッグで配置されたメンバーを保存）
   const assignMemberToSlot = (date, teamId, positionId, blockData) => {
