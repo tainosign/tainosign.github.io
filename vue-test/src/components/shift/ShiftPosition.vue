@@ -17,9 +17,10 @@
       <div class="flex flex-col gap-2">
         <ShiftSlot
           v-for="slot in position.slots"
-          :key="slot.slotId || slot.id"
-          :slot-id="slot.slotId || slot.id"
-          :shift-date="shiftDate"
+          :key="slot.slotId"
+        :slot-id="slot.slotId"
+        :blocks="slot.blocks"
+          :shift-date="shiftDate"          
           :team-id="teamId"
           :position-id="position.positionId"
           :blocks="slot.blocks || slot.members || []"
@@ -64,37 +65,25 @@ function addSlot() {
 
 function onRemoveSlot(slotId) {
   const shift = store.shifts.find((s) => s.date === props.shiftDate);
-  if (!shift) return;
-  const team = shift.teams.find((t) => t.id === props.teamId);
-  if (!team) return;
-  const pos = team.positions.find((p) => p.positionId === props.position.positionId);
-  if (!pos) return;
-  pos.slots = pos.slots.filter(s => (s.slotId || s.id) !== slotId);
-  emit("update-position");
-}
-
-function onSlotsUpdate(payload) {
-  // payload = { slotId, blocks }
-  if (!payload || !payload.slotId) return;
-  const shift = store.shifts.find((s) => s.date === props.shiftDate);
-  if (!shift) return;
-  const team = shift.teams.find((t) => t.id === props.teamId);
-  if (!team) return;
-  const pos = team.positions.find((p) => p.positionId === props.position.positionId);
-  if (!pos) return;
-
-  const slotIdx = pos.slots.findIndex(s => (s.slotId === payload.slotId || s.id === payload.slotId));
-  if (slotIdx !== -1) {
-    pos.slots[slotIdx].blocks = (payload.blocks || []).map(b => ({ ...b }));
-  } else {
-    pos.slots.push({
-      slotId: payload.slotId,
-      blocks: (payload.blocks || []).map(b => ({ ...b })),
-    });
+  const team = shift?.teams.find((t) => t.id === props.teamId);
+  const pos = team?.positions.find((p) => p.positionId === props.position.positionId);
+  if (pos) {
+    pos.slots = pos.slots.filter((s) => s.slotId !== slotId);
+    store.removeSlot(props.shiftDate, props.teamId, props.position.positionId, slotId);
+    emit("update-position");
   }
-
-  emit("update-position");
 }
+
+function onSlotsUpdate({ slotId, blocks }) {
+  const shift = store.shifts.find((s) => s.date === props.shiftDate);
+  const team = shift?.teams.find((t) => t.id === props.teamId);
+  const pos = team?.positions.find((p) => p.positionId === props.position.positionId);
+  if (pos) {
+    const idx = pos.slots.findIndex((s) => s.slotId === slotId);
+    if (idx !== -1) pos.slots[idx].blocks = blocks;
+    emit("update-position");
+  }
+  }
 </script>
 
 <style scoped>
